@@ -1,0 +1,7 @@
+name = "brandflow-api"
+main = "worker/index.js"
+compatibility_date = "2025-01-01"
+workers_dev = true
+
+[vars]
+ALLOWED_ORIGIN = "http://localhost:5173"
