@@ -1,7 +1,12 @@
-name = "brandflow-api"
+name = "raj-infra"
 main = "worker/index.js"
 compatibility_date = "2025-01-01"
 workers_dev = true
 
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
 [vars]
-ALLOWED_ORIGIN = "http://localhost:5173"
+ALLOWED_ORIGIN = "https://raj-infra.yashhh732.workers.dev"
