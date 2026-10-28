@@ -1,0 +1,18 @@
+RAJ INFRA V2 — PART 1
+
+1. Extract this ZIP. It has src/, worker/, scripts/ directly at its root.
+2. Upload ALL extracted contents directly to your GitHub repository ROOT.
+   Do not put them inside an additional folder.
+3. BACK UP your original GitHub code and Google spreadsheet first.
+4. Read README.md before deploying: this update changes how brand IDs and
+   permissions are handled. Old records with blank brand_id will be hidden.
+5. Run scripts/setup-sheets.gs in Google Apps Script.
+6. Set your real BRANDS_JSON and USERS_JSON brand permissions as Worker secrets.
+7. npm install -> npm run build -> staging test -> deploy.
+
+Included now: 3 role templates, dual theme, carousels, search, brand switcher,
+notifications preview, basic workflow, basic document line items, analytics,
+quick actions, audit view, preferences and onboarding.
+
+Not included yet: true 3D mesh, full accounting, file uploads, branded PDFs,
+transactional audit, push notifications, full drag-and-drop workflow.
