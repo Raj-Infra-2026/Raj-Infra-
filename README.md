@@ -36,3 +36,7 @@ npm run deploy
 ```
 
 Keep credentials out of GitHub.
+
+## Products / Invoices / Delivery Notes update
+
+See [DEPLOY_AND_TEST.md](DEPLOY_AND_TEST.md) for the new Products worksheet, document builders, invoice calculations, bilingual A4 browser PDF printing, role permissions and deployment verification. Existing seven worksheet schemas remain unchanged.
