@@ -1,6 +1,6 @@
 {
-  "name": "raj-infra-v2-products-invoices-delivery",
-  "version": "2.1.0",
+  "name": "raj-infra-v2-part1",
+  "version": "2.0.0-part1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "worker:dev": "wrangler dev",
     "deploy": "npm run build && wrangler deploy",
-    "test": "node tests/worker-smoke.mjs && node tests/products-invoices.mjs"
+    "test": "node tests/worker-smoke.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
