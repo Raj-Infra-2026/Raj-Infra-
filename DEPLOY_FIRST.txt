@@ -1,18 +1,10 @@
-RAJ INFRA V2 — PART 1
+RAJ INFRA V2 — NO BRAND SELECTOR
 
-1. Extract this ZIP. It has src/, worker/, scripts/ directly at its root.
-2. Upload ALL extracted contents directly to your GitHub repository ROOT.
-   Do not put them inside an additional folder.
-3. BACK UP your original GitHub code and Google spreadsheet first.
-4. Read README.md before deploying: this update changes how brand IDs and
-   permissions are handled. Old records with blank brand_id will be hidden.
-5. Run scripts/setup-sheets.gs in Google Apps Script.
-6. Set your real BRANDS_JSON and USERS_JSON brand permissions as Worker secrets.
-7. npm install -> npm run build -> staging test -> deploy.
-
-Included now: 3 role templates, dual theme, carousels, search, brand switcher,
-notifications preview, basic workflow, basic document line items, analytics,
-quick actions, audit view, preferences and onboarding.
-
-Not included yet: true 3D mesh, full accounting, file uploads, branded PDFs,
-transactional audit, push notifications, full drag-and-drop workflow.
+1. BACK UP the current Google Sheet and Worker before deploying.
+2. Upload all repository files to GitHub root.
+3. Deploy Worker `raj` to https://raj.ani-infra.workers.dev.
+4. Keep AUTH_SECRET, USERS_JSON, SPREADSHEET_ID, SERVICE_ACCOUNT_JSON on Worker `raj`.
+5. BRANDS_JSON is no longer used. USERS_JSON no longer requires brand assignments.
+6. Do not delete the old brand_id column B in Sheets; the app ignores it and existing rows remain readable.
+7. Test login, Clients, invoices, edit permissions, and audit behavior before production rollout.
+8. /api/health responding does NOT prove Sheets authentication works.
