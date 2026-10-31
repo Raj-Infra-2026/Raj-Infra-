@@ -3,7 +3,7 @@
 ## Included
 - Products sidebar and product create/edit form, backend Products worksheet auto-creation, SKU duplicate checks.
 - Invoice Builder with editable multiline descriptions, product selection, manual quantity/rate, 15% VAT calculation, client creation popup and draft print preview.
-- Backend invoice item validation, finalized-invoice edit restrictions, hashed-password-only login, request-size limit and sanitized internal server errors.
+- Backend invoice item validation, finalized-invoice edit restrictions, existing plaintext USERS_JSON login restored (optional hashed passwords remain supported), request-size limit and sanitized internal server errors.
 - Products added to Apps Script setup.
 
 ## IMPORTANT — NOT PRODUCTION-READY OR ZATCA-COMPLIANT
@@ -17,7 +17,7 @@
 ## Setup
 1. Backup existing Google Sheets and deployed Worker.
 2. Run setupDatabase() in the existing spreadsheet if needed, or let the Worker create the Products tab when accessed.
-3. Configure secrets using `wrangler secret put` and hashed users in USERS_JSON.
+3. Keep your existing USERS_JSON exactly as before; plaintext `password` entries work again. Do not share passwords. Existing optional hashed-password entries also work.
 4. Set ALLOWED_ORIGIN to the exact application origin; configure Cloudflare WAF rate limits for /api/login.
 5. Install dependencies and run `npm run build`, `npm test` in an internet-enabled environment.
 6. Test products, invoice draft saving, client creation, permissions, and print layout before deployment.
