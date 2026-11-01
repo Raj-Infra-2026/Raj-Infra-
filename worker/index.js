@@ -50,9 +50,97 @@ async function googleToken(env) { if (tokenCache.value && Date.now() < tokenCach
 finally {
     tokenPending = null;
 } }
-async function sheet(env, table, method = 'GET', range = 'A:I', body) { if (![...TABLES, 'AuditLogs'].includes(table))
-    throw Error('Invalid table'); const token = await googleToken(env); const base = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(env.SPREADSHEET_ID)}/values/${encodeURIComponent(table + '!' + range)}`; const url = method === 'APPEND' ? base + ':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS' : method === 'PUT' ? base + '?valueInputOption=RAW' : base; const r = await fetch(url, { method: method === 'APPEND' ? 'POST' : method, headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }); if (!r.ok)
-    throw Error('Google Sheets ' + table + ' failed (' + r.status + ')'); return r.json(); }
+// Keep Google Sheets read traffic low. Cache raw table data only; permissions are
+// evaluated on every API request, after reading the cached records.
+const SHEET_READ_TTL_MS = 60_000;
+const SHEET_STALE_LIMIT_MS = 5 * 60_000;
+const sheetReads = new Map();
+const pendingSheetReads = new Map();
+
+function sheetCacheKey(env, table, range) {
+    return `${env.SPREADSHEET_ID}:${table}:${range}`;
+}
+
+function clearSheetCache(env, table) {
+    const prefix = `${env.SPREADSHEET_ID}:${table}:`;
+    for (const key of sheetReads.keys()) {
+        if (key.startsWith(prefix)) sheetReads.delete(key);
+    }
+}
+
+function retryDelayMs(response, attempt) {
+    const retryAfter = response.headers.get('retry-after');
+    if (retryAfter) {
+        const seconds = Number(retryAfter);
+        if (Number.isFinite(seconds) && seconds >= 0)
+            return Math.min(5_000, seconds * 1000);
+    }
+    return Math.min(3_000, 500 * (2 ** attempt)) + Math.floor(Math.random() * 250);
+}
+
+async function googleSheetsRequest(url, options, table) {
+    for (let attempt = 0; attempt < 4; attempt++) {
+        const response = await fetch(url, options);
+        if (response.ok) return response.json();
+
+        if ((response.status === 429 || response.status >= 500) && attempt < 3) {
+            await new Promise(resolve => setTimeout(resolve, retryDelayMs(response, attempt)));
+            continue;
+        }
+
+        if (response.status === 429) {
+            const error = new Error(`Google Sheets ${table} rate limit reached (429). Please retry shortly.`);
+            error.status = 503;
+            throw error;
+        }
+        throw Error(`Google Sheets ${table} failed (${response.status})`);
+    }
+}
+
+async function sheet(env, table, method = 'GET', range = 'A:I', body) {
+    if (![...TABLES, 'AuditLogs'].includes(table)) throw Error('Invalid table');
+
+    const cacheKey = sheetCacheKey(env, table, range);
+    const existing = sheetReads.get(cacheKey);
+    if (method === 'GET' && existing && Date.now() - existing.at < SHEET_READ_TTL_MS)
+        return existing.data;
+    if (method === 'GET' && pendingSheetReads.has(cacheKey))
+        return pendingSheetReads.get(cacheKey);
+
+    const operation = async () => {
+        const token = await googleToken(env);
+        const base = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(env.SPREADSHEET_ID)}/values/${encodeURIComponent(table + '!' + range)}`;
+        const url = method === 'APPEND'
+            ? base + ':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS'
+            : method === 'PUT' ? base + '?valueInputOption=RAW' : base;
+        try {
+            const result = await googleSheetsRequest(url, {
+                method: method === 'APPEND' ? 'POST' : method,
+                headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+                body: body ? JSON.stringify(body) : undefined
+            }, table);
+            if (method === 'GET') sheetReads.set(cacheKey, { at: Date.now(), data: result });
+            else clearSheetCache(env, table);
+            return result;
+        } catch (error) {
+            // Short-lived stale data is preferable to an empty Clients dropdown
+            // during a temporary quota spike. Never serve stale data for writes.
+            if (method === 'GET' && error.status === 503 && existing &&
+                Date.now() - existing.at < SHEET_STALE_LIMIT_MS) {
+                console.warn(`Temporary Sheets quota limit for ${table}; serving cached read`);
+                return existing.data;
+            }
+            throw error;
+        }
+    };
+
+    if (method !== 'GET') return operation();
+    const pending = operation();
+    pendingSheetReads.set(cacheKey, pending);
+    try { return await pending; }
+    finally { pendingSheetReads.delete(cacheKey); }
+}
+
 // Single-company profile, stored in the existing spreadsheet. Only Admin may update it.
 const COMPANY_FIELDS = [
     'name_en', 'name_ar', 'vat_number', 'cr_number', 'address',
@@ -476,6 +564,6 @@ export default { async fetch(req, env) {
         }
         catch (e) {
             console.error(e);
-            return reply({ error: e.message || 'Unexpected server error' }, errorStatus(e.message || ''), origin);
+            return reply({ error: e.message || 'Unexpected server error' }, e.status || errorStatus(e.message || ''), origin);
         }
     } };

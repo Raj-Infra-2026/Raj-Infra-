@@ -130,3 +130,92 @@
     .company-settings-panel { padding: 18px; }
     .company-settings-grid { grid-template-columns: 1fr; }
 }
+
+
+/* Invoice Builder: full-width, left-aligned financial summary.
+   Scoped to the business modal to avoid changing other dashboards. */
+.business-modal .business-totals {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  margin: 20px 0 0;
+  padding: clamp(16px, 2.5vw, 26px);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  align-self: stretch;
+}
+.business-modal .business-totals > div:not(.adjustment-editor) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-width: 0;
+  padding: 11px 0;
+}
+.business-modal .business-totals > div > b { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.business-modal .adjustment-editor {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin: 12px 0;
+  padding: 20px 0;
+  border-top: 1px solid var(--line, var(--border, #ddd));
+  border-bottom: 1px solid var(--line, var(--border, #ddd));
+}
+.business-modal .adjustment-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px 20px;
+  margin-bottom: 16px;
+}
+.business-modal .adjustment-heading > div { display: block; flex: 1 1 240px; min-width: 0; }
+.business-modal .adjustment-heading strong { display: block; font-size: 15px; line-height: 1.4; }
+.business-modal .adjustment-heading .field-hint { margin: 5px 0 0; max-width: 58ch; }
+.business-modal .adjustment-heading .adjustment-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  min-height: 42px;
+  padding: 10px 16px;
+  white-space: normal;
+  text-align: center;
+}
+.business-modal .adjustment-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr) 44px;
+  align-items: end;
+  gap: 14px;
+  width: 100%;
+  margin: 12px 0;
+}
+.business-modal .adjustment-row > label { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.business-modal .adjustment-row input,
+.business-modal .adjustment-row select { box-sizing: border-box; width: 100%; min-width: 0; height: 44px; }
+.business-modal .adjustment-row > .icon-btn { width: 44px; height: 44px; margin: 0; }
+.business-modal .adjustment-editor > div:last-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line, var(--border, #ddd));
+}
+.business-modal .business-totals > .grand {
+  font-size: 18px;
+  font-weight: 700;
+  border-top: 0;
+}
+@media (max-width: 600px) {
+  .business-modal .business-totals { padding: 16px; }
+  .business-modal .adjustment-heading { align-items: stretch; }
+  .business-modal .adjustment-heading .adjustment-add { width: 100%; }
+  .business-modal .adjustment-row { grid-template-columns: minmax(0, 1fr) minmax(0, .8fr) 40px; gap: 8px; }
+  .business-modal .adjustment-row > .icon-btn { width: 40px; }
+}
