@@ -410,3 +410,6 @@
   .company-profile-footer { flex-direction: column; align-items: stretch; }
   .company-profile-page { padding: 18px; }
 }
+
+/* Manual document line items — clear spacing and responsive fields. */
+.business-line.manual-line{display:grid;grid-template-columns:minmax(0,2fr) minmax(110px,1fr) minmax(140px,1fr) auto;gap:16px;align-items:end}.business-line.manual-line .invoice-line-number{grid-column:1/-1}.business-line.manual-line label{min-width:0}.business-line.manual-line .description-editor textarea{min-height:110px;width:100%;resize:vertical}.invoice-notes-field{display:flex;flex-direction:column;gap:8px}.invoice-notes-field textarea{width:100%;min-height:100px;resize:vertical}@media(max-width:760px){.business-line.manual-line{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.business-line.manual-line .description-editor{grid-column:1/-1}}

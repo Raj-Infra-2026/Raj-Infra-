@@ -336,7 +336,7 @@ function cleanSpecial(table, b, r) {
         if (Object.prototype.hasOwnProperty.call(b, 'items')) {
             if (!Array.isArray(b.items) || !b.items.length || b.items.length > 100)
                 throw Error('Invoice requires 1–100 products');
-            r.items = b.items.map(x => ({ product_id: String(x.product_id || '').slice(0, 80), sku: String(x.sku || '').slice(0, 80), brand: String(x.brand || '').slice(0, 120), description: String(x.description || '').trim().slice(0, 200), quantity: Number(x.quantity), unit_price: Number(x.unit_price) }));
+            r.items = b.items.map(x => ({ description: String(x.description || '').trim().slice(0, 3000), quantity: Number(x.quantity), unit_price: Number(x.unit_price) }));
             if (r.items.some(x => !x.description || !Number.isFinite(x.quantity) || x.quantity <= 0 || !Number.isFinite(x.unit_price) || x.unit_price < 0))
                 throw Error('Invalid invoice quantity or rate');
         }
@@ -369,7 +369,7 @@ function cleanSpecial(table, b, r) {
         if (Object.prototype.hasOwnProperty.call(b, 'items')) {
             if (!Array.isArray(b.items) || !b.items.length || b.items.length > 100)
                 throw Error('Delivery note requires 1–100 products');
-            r.items = b.items.map(x => ({ product_id: String(x.product_id || '').slice(0, 80), sku: String(x.sku || '').slice(0, 80), brand: String(x.brand || '').slice(0, 120), description: String(x.description || '').trim().slice(0, 200), quantity: Number(x.quantity), unit: String(x.unit || '').trim().slice(0, 40), remarks: String(x.remarks || '').slice(0, 300), unit_price: 0 }));
+            r.items = b.items.map(x => ({ description: String(x.description || '').trim().slice(0, 3000), quantity: Number(x.quantity), unit: String(x.unit || '').trim().slice(0, 40), remarks: String(x.remarks || '').slice(0, 300), unit_price: 0 }));
             if (r.items.some(x => !x.description || !Number.isFinite(x.quantity) || x.quantity <= 0 || !x.unit))
                 throw Error('Delivery item needs a product, positive quantity and unit');
         }
