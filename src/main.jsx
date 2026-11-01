@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { LayoutDashboard, Users, FileText, Receipt, Truck, ClipboardList, ShoppingCart, Building2, LogOut, Plus, Package, Search, ArrowUpRight, ArrowRight, RefreshCw, Menu, X, ShieldCheck, CheckCircle2, AlertCircle, Sun, Moon, ChevronLeft, ChevronRight, Bell, Command, Activity, ChartNoAxesCombined, KanbanSquare, Settings2, HelpCircle, History, Layers3, CalendarDays, TrendingUp, Wallet, PanelLeftClose, PanelLeftOpen, Sparkles, Filter, Download, Trash2, Check, LockKeyhole, ExternalLink, PlayCircle } from 'lucide-react';
-import { ProductsPage, DocumentModal, printBusinessDocument } from './BusinessModules.jsx';
+import { ProductsPage, DocumentModal, CompanySettingsPage, printBusinessDocument } from './BusinessModules.jsx';
 import './style.css';
 const MODULES = [{ name: 'Overview', icon: LayoutDashboard }, { name: 'Clients', icon: Users, table: 'Clients' }, { name: 'Products', icon: Package }, { name: 'Quotations', icon: FileText, table: 'Quotations', client: true }, { name: 'Invoices', icon: Receipt, table: 'Invoices', client: true }, { name: 'Delivery Notes', icon: Truck, table: 'DeliveryNotes', client: true }, { name: 'Client Purchase Orders', icon: ClipboardList, table: 'ClientPOs', client: true }, { name: 'Vendors', icon: Building2, table: 'Vendors' }, { name: 'My Purchase Orders', icon: ShoppingCart, table: 'PurchaseOrders' }];
-const EXTRA = [{ name: 'Workflow', icon: KanbanSquare }, { name: 'Analytics', icon: ChartNoAxesCombined }, { name: 'Activity History', icon: History, admin: true }, { name: 'Preferences', icon: Settings2 }, { name: 'Help & Onboarding', icon: HelpCircle }];
+const EXTRA = [{ name: 'Workflow', icon: KanbanSquare }, { name: 'Analytics', icon: ChartNoAxesCombined }, { name: 'Activity History', icon: History, admin: true }, { name: 'Company Settings', icon: Building2, admin: true }, { name: 'Preferences', icon: Settings2 }, { name: 'Help & Onboarding', icon: HelpCircle }];
 const ALL = [...MODULES, ...EXTRA];
 const money = v => 'SAR ' + Number(v || 0).toLocaleString('en-SA', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 const initialTheme = () => { try {
@@ -134,6 +134,7 @@ function App() {
   {page === 'Workflow' && <Workflow token={token} role={role} onStatus={setStatus} refreshKey={overview?.recent?.[0]?.updated_at}/>}
   {page === 'Analytics' && <Analytics overview={overview} role={role}/>}
   {page === 'Activity History' && role === 'admin' && <Audit events={audit}/>}
+  {page === 'Company Settings' && role === 'admin' && <CompanySettingsPage request={(path, opts) => api(path, token, opts)}/>}
   {page === 'Preferences' && <Preferences theme={theme} setTheme={setTheme} role={role} collapsed={collapsed} setCollapsed={setCollapsed}/>}
   {page === 'Help & Onboarding' && <Help step={helpStep} setStep={v => { setHelpStep(v); localStorage.setItem('raj-help-step', String(v)); }}/>}
   {error && <div className="notice error" role="alert"><AlertCircle size={18}/><span>{error}</span><button onClick={() => setError('')}>Dismiss</button></div>}
