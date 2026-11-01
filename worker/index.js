@@ -519,7 +519,7 @@ export default { async fetch(req, env) {
                     if (!cs.some(c => c.id === rec.client_id))
                         throw Error('Select a valid client');
                 }
-                if (!rec.reference)
+                if (!rec.reference || /^(draft|preview)$/i.test(rec.reference.trim()))
                     rec.reference = (table === 'Invoices' ? 'INV' : table === 'DeliveryNotes' ? 'DN' : table.slice(0, 3).toUpperCase()) + '-' + new Date().getUTCFullYear() + '-' + rec.id.slice(0, 12).toUpperCase();
                 await sheet(env, table, 'APPEND', 'A:I', { values: [toRow(rec)] });
                 const logged = await audit(env, user, 'create', table, rec);
