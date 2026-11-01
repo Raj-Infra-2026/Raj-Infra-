@@ -53,6 +53,73 @@ finally {
 async function sheet(env, table, method = 'GET', range = 'A:I', body) { if (![...TABLES, 'AuditLogs'].includes(table))
     throw Error('Invalid table'); const token = await googleToken(env); const base = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(env.SPREADSHEET_ID)}/values/${encodeURIComponent(table + '!' + range)}`; const url = method === 'APPEND' ? base + ':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS' : method === 'PUT' ? base + '?valueInputOption=RAW' : base; const r = await fetch(url, { method: method === 'APPEND' ? 'POST' : method, headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }); if (!r.ok)
     throw Error('Google Sheets ' + table + ' failed (' + r.status + ')'); return r.json(); }
+// Single-company profile, stored in the existing spreadsheet. Only Admin may update it.
+const COMPANY_FIELDS = [
+    'name_en', 'name_ar', 'vat_number', 'cr_number', 'address',
+    'city', 'district', 'postal_code', 'phone', 'email'
+];
+const COMPANY_HEADERS = ['field', 'value'];
+
+async function companySheet(env, method = 'GET', range = 'A:B', body) {
+    const token = await googleToken(env);
+    const root = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(env.SPREADSHEET_ID)}/values/`;
+    const endpoint = root + encodeURIComponent(`CompanySettings!${range}`);
+    const url = method === 'PUT' ? endpoint + '?valueInputOption=RAW' : endpoint;
+    const response = await fetch(url, {
+        method,
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: body ? JSON.stringify(body) : undefined
+    });
+    if (!response.ok) throw Error(`Company Settings Google Sheets failed (${response.status})`);
+    return response.json();
+}
+
+async function ensureCompanySettings(env) {
+    const token = await googleToken(env);
+    const root = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(env.SPREADSHEET_ID)}`;
+    const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    const response = await fetch(root + '?fields=sheets.properties.title', { headers });
+    if (!response.ok) throw Error(`Unable to inspect spreadsheet (${response.status})`);
+    const data = await response.json();
+    if (!(data.sheets || []).some(sheet => sheet.properties?.title === 'CompanySettings')) {
+        const create = await fetch(root + ':batchUpdate', {
+            method: 'POST', headers,
+            body: JSON.stringify({ requests: [{ addSheet: { properties: { title: 'CompanySettings' } } }] })
+        });
+        if (!create.ok) {
+            const retry = await fetch(root + '?fields=sheets.properties.title', { headers });
+            const current = retry.ok ? await retry.json() : {};
+            if (!(current.sheets || []).some(sheet => sheet.properties?.title === 'CompanySettings'))
+                throw Error(`Unable to create CompanySettings worksheet (${create.status})`);
+        }
+    }
+    const values = (await companySheet(env)).values || [];
+    if (!values.length) await companySheet(env, 'PUT', 'A1:B1', { values: [COMPANY_HEADERS] });
+    else if (values[0][0] !== COMPANY_HEADERS[0] || values[0][1] !== COMPANY_HEADERS[1])
+        throw Error('CompanySettings worksheet headers differ; no data was overwritten');
+}
+
+async function getCompanySettings(env) {
+    await ensureCompanySettings(env);
+    const rows = (await companySheet(env)).values || [];
+    return Object.fromEntries(COMPANY_FIELDS.map(field => [
+        field, String(rows.slice(1).find(row => row[0] === field)?.[1] || '')
+    ]));
+}
+
+function validateCompanySettings(data) {
+    const profile = Object.fromEntries(COMPANY_FIELDS.map(field => [
+        field, String(data[field] ?? '').trim().slice(0, 500)
+    ]));
+    if (profile.vat_number && !/^\d{15}$/.test(profile.vat_number))
+        throw Error('VAT number must contain exactly 15 digits');
+    if (profile.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profile.email))
+        throw Error('Invalid company email address');
+    if (profile.phone && !/^\+?[0-9 ()-]{7,22}$/.test(profile.phone))
+        throw Error('Invalid company phone number');
+    return profile;
+}
+
 function fromRow(r) { let extra = parseJSON(r[8] || '{}', {}); if (!extra || typeof extra !== 'object' || Array.isArray(extra))
     extra = {}; return { ...extra, id: r[0] || '', brand_id: r[1] || '', reference: r[2] || '', name: r[3] || '', status: r[4] || '', amount: Number(r[5] || 0), date: r[6] || '', updated_at: r[7] || '' }; }
 function toRow(r) { const { id, brand_id, reference, name, status, amount, date, updated_at, ...extra } = r; return [id || '', brand_id || '', reference || '', name || '', status || '', Number(amount) || 0, date || '', updated_at || new Date().toISOString(), JSON.stringify(extra)]; }
@@ -256,6 +323,21 @@ export default { async fetch(req, env) {
                 return reply({ error: 'Session expired or unauthorized' }, 401, origin);
             if (url.pathname === '/api/me')
                 return reply({ user: { username: user.username, role: user.role } }, 200, origin);
+            if (url.pathname === '/api/company-settings') {
+                if (req.method === 'GET')
+                    return reply({ company: await getCompanySettings(env) }, 200, origin);
+                if (req.method === 'PUT') {
+                    if (user.role !== 'admin')
+                        return reply({ error: 'Only Admin may update company settings' }, 403, origin);
+                    const company = validateCompanySettings(await req.json());
+                    await ensureCompanySettings(env);
+                    await companySheet(env, 'PUT', `A1:B${COMPANY_FIELDS.length + 1}`, {
+                        values: [COMPANY_HEADERS, ...COMPANY_FIELDS.map(field => [field, company[field]])]
+                    });
+                    return reply({ company }, 200, origin);
+                }
+                return reply({ error: 'Method not allowed' }, 405, origin);
+            }
             if (url.pathname === '/api/products' || url.pathname.startsWith('/api/products/')) {
                 const parts = url.pathname.split('/').filter(Boolean), id = parts[2];
                 const permission = { GET: 'read', POST: 'create', PATCH: 'update', DELETE: 'delete' }[req.method];

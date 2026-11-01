@@ -78,3 +78,55 @@
  .business-modal .business-line > .description-editor { grid-column: span 12; }
  .adjustment-row { grid-template-columns: minmax(0,1fr) minmax(100px,1fr) 38px; }
 }
+
+/* Raj Infra — consistent invoice adjustments and company profile */
+.business-modal .adjustment-editor { width: 100%; min-width: 0; }
+.business-modal .adjustment-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr) 40px;
+    align-items: end;
+    gap: 14px;
+    width: 100%;
+    margin: 12px 0;
+}
+.business-modal .adjustment-row > label {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    min-width: 0;
+    font-size: 12px;
+    font-weight: 600;
+}
+.business-modal .adjustment-row input,
+.business-modal .adjustment-row select { width: 100%; min-width: 0; height: 44px; }
+.business-modal .adjustment-row > .icon-btn { width: 40px; height: 44px; margin: 0; }
+.company-settings-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    background: rgba(8, 9, 16, .78);
+    display: grid;
+    place-items: center;
+    padding: 20px;
+}
+.company-settings-panel {
+    width: min(760px, 100%);
+    max-height: min(88vh, 900px);
+    overflow: auto;
+    padding: 28px;
+    border: 1px solid var(--line, #555);
+    border-radius: 18px;
+    background: var(--surface, #242330);
+    color: var(--text, #f5f5f5);
+    box-shadow: 0 25px 90px rgba(0, 0, 0, .4);
+}
+.company-settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 24px; }
+.company-settings-grid label { display: flex; flex-direction: column; gap: 7px; font-size: 12px; font-weight: 600; min-width: 0; }
+.company-settings-grid input { width: 100%; min-width: 0; padding: 12px; border-radius: 9px; border: 1px solid var(--line, #777); background: var(--surface2, #33303e); color: var(--text, #fff); }
+.company-settings-actions { display: flex; justify-content: flex-end; gap: 12px; flex-wrap: wrap; margin-top: 24px; }
+.qr-warning { font-size: 11px; color: #a54237; max-width: 180px; }
+@media (max-width: 600px) {
+    .business-modal .adjustment-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 40px; gap: 8px; }
+    .company-settings-panel { padding: 18px; }
+    .company-settings-grid { grid-template-columns: 1fr; }
+}
