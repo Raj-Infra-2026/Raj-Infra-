@@ -50,3 +50,31 @@
 .business-line .description-editor textarea{width:100%;min-height:85px;resize:vertical;font:inherit;line-height:1.5;padding:10px;border-radius:9px;border:1px solid var(--line,#aaa);background:var(--panel,#fff);color:inherit}
 .business-line .description-editor textarea:focus-visible{outline:2px solid #b65c3e;outline-offset:2px}
 @media(max-width:700px){.business-line .description-editor{grid-column:1/-1}}
+
+
+/* Workspace form refinements — accessible dropdowns and spacious document rows. */
+.record-modal select,
+.business-modal select { color: var(--text); background: var(--surface2); color-scheme: dark; }
+[data-theme="light"] .record-modal select,
+[data-theme="light"] .business-modal select { color-scheme: light; }
+.record-modal select option,
+.business-modal select option { color: #20202a; background: #f7f5fb; }
+.business-modal .business-line { display: grid; grid-template-columns: repeat(12, minmax(0,1fr)); gap: 14px; align-items: end; margin-bottom: 18px; }
+.business-modal .business-line > label { min-width: 0; grid-column: span 3; }
+.business-modal .business-line > .product-select,
+.business-modal .business-line > .description-editor { grid-column: span 6; }
+.business-modal .business-line textarea { min-height: 96px; resize: vertical; }
+.business-modal .business-line input,
+.business-modal .business-line select { min-width: 0; width: 100%; }
+.business-modal .business-line .remove-line { grid-column: span 1; }
+.adjustment-editor { border-top: 1px solid var(--line); padding: 16px 0; margin-top: 12px; }
+.adjustment-editor > strong { display: block; margin-bottom: 8px; }
+.adjustment-row { display: grid; grid-template-columns: minmax(180px,2fr) minmax(120px,1fr) 38px; gap: 12px; align-items: center; margin: 10px 0; }
+.adjustment-row input,.adjustment-row select { width: 100%; min-width: 0; }
+.create-client-inline { margin-top: 10px; }
+@media (max-width: 780px) {
+ .business-modal .business-line > label,
+ .business-modal .business-line > .product-select,
+ .business-modal .business-line > .description-editor { grid-column: span 12; }
+ .adjustment-row { grid-template-columns: minmax(0,1fr) minmax(100px,1fr) 38px; }
+}
