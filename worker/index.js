@@ -1,3 +1,5 @@
+import { buildUnsignedInvoiceDraft } from './zatca/xml-draft.mjs';
+import { inspectDraftInvoice } from './zatca/draft-validation.mjs';
 /* ALIF LABS multi-company API. Credentials are server-side only.
    Public registration uses a master spreadsheet; each authenticated tenant gets its own sheet. */
 const TABLES = ['Clients', 'Quotations', 'Invoices', 'DeliveryNotes', 'ClientPOs', 'Vendors', 'PurchaseOrders'];
@@ -426,6 +428,39 @@ export default { async fetch(req, env) {
             env = session.tenantEnv;
             if (url.pathname === '/api/me')
                 return reply({ user: { username: user.username, role:'admin', company_name:tenant.company_name } }, 200, origin);
+            // Authenticated, tenant-scoped engineering preview. This never issues, signs,
+            // reports, clears, or changes an invoice. Not a production ZATCA document.
+            if (url.pathname.startsWith('/api/zatca/draft-xml/')) {
+                if (req.method !== 'GET') return reply({ error: 'Method not allowed' }, 405, origin);
+                const invoiceId = decodeURIComponent(url.pathname.slice('/api/zatca/draft-xml/'.length));
+                if (!invoiceId || invoiceId.length > 128 || invoiceId.includes('/'))
+                    return reply({ error: 'Invalid invoice ID' }, 400, origin);
+                const invoice = (await records(env, 'Invoices')).find(r => r.id === invoiceId && visible(user, r));
+                if (!invoice) return reply({ error: 'Invoice not found' }, 404, origin);
+                if (invoice.status !== 'Draft') return reply({ error: 'Only draft invoices can be previewed as unsigned XML' }, 409, origin);
+                const seller = { name: invoice.seller_name, vat: invoice.seller_vat };
+                const buyer = { name: invoice.buyer_name || invoice.name || 'Customer' };
+                const kind = url.searchParams.get('kind') || 'standard';
+                const data = {
+                    kind, id: invoice.reference, uuid: invoice.id,
+                    issueDate: String(invoice.date || '').slice(0, 10), seller, buyer,
+                    items: (invoice.items || []).map(x => ({ description: x.description, quantity: x.quantity, unitPrice: x.unit_price }))
+                };
+                // This starter generator supports only simple 15% VAT lines. Reject
+                // adjustments rather than silently generate incorrect totals.
+                if ((invoice.adjustments || []).length || Number(invoice.discount || 0))
+                    return reply({ error: 'XML draft preview does not support invoice adjustments or discounts yet' }, 422, origin);
+                if (Number(invoice.tax_rate) !== 15 || !Array.isArray(invoice.items) || !invoice.items.length)
+                    return reply({ error: 'XML preview requires a 15% VAT invoice with line items' }, 422, origin);
+                const expected = Math.round(invoice.items.reduce((sum, x) => sum + Number(x.quantity) * Number(x.unit_price), 0) * 115) / 100;
+                if (Math.abs(expected - Number(invoice.amount)) > 0.011)
+                    return reply({ error: 'Invoice totals differ from the XML preview calculation' }, 422, origin);
+                const preflight = inspectDraftInvoice(data);
+                if (!preflight.readyForDraft) return reply({ error: 'Invoice XML draft preflight failed', preflight }, 422, origin);
+                const generated = buildUnsignedInvoiceDraft(data);
+                return reply({ status: 'UNSIGNED_DEVELOPMENT_DRAFT', invoice_id: invoice.id,
+                    xml: generated, preflight, warning: 'Not ZATCA validated, signed, cleared or reported. Not for official issuance.' }, 200, origin);
+            }
             if (url.pathname === '/api/company-settings') {
                 if (req.method === 'GET')
                     return reply({ company: await getCompanySettings(env) }, 200, origin);
