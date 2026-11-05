@@ -1,42 +1,37 @@
-# Raj Infra V2 — Unified Workspace (No Brands)
+# ALIF LABS — Multi-company SaaS
 
-One workspace for all existing Google Sheets records, with three role-specific visual themes:
-- Admin: Graphite Pulse
-- Manager: Obsidian Aurora
-- Staff: Ivory Atelier
+ALIF LABS is a React/Vite website and unified Admin workspace, with a Cloudflare Worker backend and Google Sheets business storage.
 
-All roles have light/dark mode. The brand selector, Brand One/Two/Three, BRANDS_JSON and brand-based record filtering have been removed. **Existing records with empty or nonempty brand_id are visible** subject to role permissions. No migration is required.
+## What's implemented in this release
 
-## Deployment
+- Public `/`, `/login` and `/register` pages with ALIF LABS identity.
+- Registration saved to the master Google Spreadsheet's **Clients** tab with `Pending` status.
+- You approve company registrations by setting **status (column H)** to `Active`.
+- An installable Google Apps Script approval trigger automatically provisions each company's separate spreadsheet, creates business worksheets and shares it with the Worker service account. A scheduled retry reconciles failed/missed trigger events.
+- Once the master `provision_state` column displays `Ready`, the company owner can log in to the single Admin workspace.
+- Company-specific spreadsheet access is enforced by backend session-to-tenant mapping. There are no public staff or manager accounts.
+- Client, quotation, delivery, vendor, purchase-order, settings and overview functionality remains from the supplied baseline.
+- Product catalogue API/navigation is disabled; line items are entered manually.
+- New tax-invoice **issuance is disabled by default** until a separate compliance process is completed. This prevents the development invoice builder from being treated as a live ZATCA-integrated system.
+- Registration passwords are salted PBKDF2 hashes inside the master Google Sheet, **not plaintext**; this requires no extra database and avoids exposing customer passwords.
 
-1. Back up the live Worker configuration and Google Sheets before deploying.
-2. Upload the repository contents (not the outer folder) to GitHub.
-3. Confirm Cloudflare is deploying Worker `raj` from `wrangler.toml` with `npm run deploy`.
-4. Verify secrets `AUTH_SECRET`, `USERS_JSON`, `SPREADSHEET_ID`, `SERVICE_ACCOUNT_JSON` remain configured for Worker `raj`. `USERS_JSON` needs `username`, `role`, and either a hashed password or legacy `password`; `brands` is no longer required.
-5. No need to run `setupDatabase()` on existing populated spreadsheets. It is additive and retains the original nine-column format. Column B is preserved but unused for access checks.
-6. Test `/api/health`, login, Clients, and read/create/edit permissions in a staging environment before updating production.
+## Deployment and integration
 
-## Role permissions
+Read **DEPLOYMENT.md** and **ZATCA_READINESS.md** before launch.
 
-- Admin: read, create, update, archive.
-- Manager: read, create, update. Existing client names are locked from manager editing.
-- Staff: read and create.
-
-## Existing limitations
-
-The health endpoint only verifies the Worker is responding. Google Sheets read/write access requires correct credentials and spreadsheet sharing. Document PDFs are browser print previews. No complete accounting, push notifications, or production 3D scene yet. The AuditLogs sheet is optional for reading, but recommended for event history; audit write failures are reported as warnings.
-
-## Local commands
-
-```sh
+```bash
 npm install
 npm test
 npm run build
 npm run deploy
 ```
 
-Keep credentials out of GitHub.
+Only the offline integration test was executed in this environment. NPM dependency installation timed out, so a complete Vite production build was **not** verified here.
 
-## Products / Invoices / Delivery Notes update
+## Important limitations
 
-See [DEPLOY_AND_TEST.md](DEPLOY_AND_TEST.md) for the new Products worksheet, document builders, invoice calculations, bilingual A4 browser PDF printing, role permissions and deployment verification. Existing seven worksheet schemas remain unchanged.
+- **Not ZATCA-certified or production-ready for live tax invoicing.** Phase 2 XML signing, CSID onboarding, clearance/reporting, cryptographic chaining and official compliance tests are not present.
+- The Apps Script trigger and Google APIs need authorization and live verification against your new master spreadsheet. These cannot be configured from the uploaded ZIP.
+- This version should be deployed to staging for business acceptance and tenant-isolation testing before being offered to live paying customers. Public registration should have robust anti-abuse protection, backups, monitoring, secure domain/TLS and a privacy policy.
+- Only one Admin owner account per registered company is supported.
+- Legacy data is not migrated automatically. Keep your original spreadsheets backed up and do not repurpose existing customer `Clients` tabs as the **master registry**.

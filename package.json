@@ -1,5 +1,5 @@
 {
-  "name": "raj-infra-v2-products-invoices-delivery",
+  "name": "alif-labs-platform",
   "version": "2.1.0",
   "private": true,
   "type": "module",
@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "worker:dev": "wrangler dev",
     "deploy": "npm run build && wrangler deploy",
-    "test": "node tests/worker-smoke.mjs && node tests/products-invoices.mjs"
+    "test": "node tests/multi-tenant.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
@@ -20,5 +20,6 @@
     "@vitejs/plugin-react": "^4.3.4",
     "vite": "^6.0.5",
     "wrangler": "^4.0.0"
-  }
+  },
+  "description": "ALIF LABS unified owner SaaS with Google Sheets tenant isolation"
 }

@@ -1,8 +1,8 @@
-/* Raj Infra · Cloudflare Worker — Cloudflare Worker / Google Sheets adapter.
-   A:I original sheet format retained. Configure secrets via wrangler secret put. */
+/* ALIF LABS multi-company API. Credentials are server-side only.
+   Public registration uses a master spreadsheet; each authenticated tenant gets its own sheet. */
 const TABLES = ['Clients', 'Quotations', 'Invoices', 'DeliveryNotes', 'ClientPOs', 'Vendors', 'PurchaseOrders'];
 const DOCS = ['Quotations', 'Invoices', 'DeliveryNotes', 'ClientPOs', 'PurchaseOrders'];
-const ROLES = { admin: ['read', 'create', 'update', 'delete'], manager: ['read', 'create', 'update'], staff: ['read', 'create'] };
+const ROLES = { admin: ['read', 'create', 'update', 'delete'] }; // one company-owner account
 const enc = new TextEncoder(), dec = new TextDecoder();
 let tokenCache = { value: null, expires: 0 };
 let tokenPending = null;
@@ -24,7 +24,7 @@ catch {
     return null;
 } }
 function reply(data, status = 200, origin = '') { return new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', ...(origin ? { 'access-control-allow-origin': origin, 'vary': 'Origin' } : {}) } }); }
-function cors(req, env) { const o = req.headers.get('Origin') || ''; return (env.ALLOWED_ORIGIN || '').split(',').map(x => x.trim()).includes(o) ? o : ''; }
+function cors(req, env) { const o = req.headers.get('Origin') || ''; if (!o) return ''; const allowed = (env.ALLOWED_ORIGIN || '').split(',').map(x => x.trim()); return (o === new URL(req.url).origin || allowed.includes(o)) ? o : ''; }
 function parseJSON(s, fallback) { try {
     return JSON.parse(s);
 }
@@ -277,54 +277,6 @@ async function audit(env, user, action, table, record) {
         return false;
     }
 }
-// Additive Products worksheet: isolated from the original seven business tables.
-const PRODUCT_HEADERS = ['id', 'product_name', 'product_brand', 'sku', 'created_at', 'updated_at', 'status'];
-async function productApi(env, method = 'GET', range = 'A:G', body) {
-    const token = await googleToken(env);
-    const base = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(env.SPREADSHEET_ID)}/values/${encodeURIComponent('Products!' + range)}`;
-    const url = method === 'APPEND' ? base + ':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS' : method === 'PUT' ? base + '?valueInputOption=RAW' : base;
-    const r = await fetch(url, { method: method === 'APPEND' ? 'POST' : method, headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
-    if (!r.ok)
-        throw Error('Products Google Sheets request failed (' + r.status + ')');
-    return r.json();
-}
-async function ensureProducts(env) {
-    const token = await googleToken(env), root = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(env.SPREADSHEET_ID)}`;
-    const headers = { authorization: 'Bearer ' + token, 'content-type': 'application/json' };
-    const info = await fetch(root + '?fields=sheets.properties.title', { headers });
-    if (!info.ok)
-        throw Error('Cannot inspect Google Spreadsheet (' + info.status + ')');
-    const data = await info.json();
-    if (!(data.sheets || []).some(x => x.properties?.title === 'Products')) {
-        const create = await fetch(root + ':batchUpdate', { method: 'POST', headers, body: JSON.stringify({ requests: [{ addSheet: { properties: { title: 'Products' } } }] }) });
-        if (!create.ok) { // Another request may have created the tab at the same time.
-            const again = await fetch(root + '?fields=sheets.properties.title', { headers });
-            const checked = again.ok ? await again.json() : {};
-            if (!(checked.sheets || []).some(x => x.properties?.title === 'Products'))
-                throw Error('Cannot create Products worksheet (' + create.status + ')');
-        }
-    }
-    const r = await productApi(env);
-    if (!(r.values || []).length) {
-        await productApi(env, 'PUT', 'A1:G1', { values: [PRODUCT_HEADERS] });
-        return;
-    }
-    const existing = r.values[0] || [];
-    if (PRODUCT_HEADERS.some((x, i) => String(existing[i] || '').trim() !== x))
-        throw Error('Products worksheet has different headers. No data was changed; inspect the sheet before proceeding.');
-}
-function productRows(values) { return (values || []).slice(1).map((r, i) => ({ row: i + 2, id: r[0] || '', name: r[1] || '', brand: r[2] || '', sku: r[3] || '', created_at: r[4] || '', updated_at: r[5] || '', status: r[6] || 'Active' })).filter(x => x.id && x.status !== 'Deleted'); }
-function productPayload(b, old) {
-    const name = String(b.name ?? old?.name ?? '').trim(), brand = String(b.brand ?? old?.brand ?? '').trim(), sku = String(b.sku ?? old?.sku ?? '').trim().toUpperCase();
-    if (!name || name.length > 200)
-        throw Error('Product name is required (maximum 200 characters)');
-    if (!brand || brand.length > 120)
-        throw Error('Product brand is required (maximum 120 characters)');
-    if (sku && (sku.length > 80 || !/^[A-Z0-9][A-Z0-9._/-]*$/.test(sku)))
-        throw Error('Invalid SKU / Item Code. Use letters, numbers, dot, dash, slash or underscore');
-    return { id: old?.id || crypto.randomUUID(), name, brand, sku, created_at: old?.created_at || new Date().toISOString(), updated_at: new Date().toISOString(), status: 'Active' };
-}
-function productValues(p) { return [p.id, p.name, p.brand, p.sku, p.created_at, p.updated_at, p.status]; }
 function cleanSpecial(table, b, r) {
     if (!['Invoices', 'DeliveryNotes'].includes(table))
         return r;
@@ -335,13 +287,13 @@ function cleanSpecial(table, b, r) {
     if (table === 'Invoices') {
         if (Object.prototype.hasOwnProperty.call(b, 'items')) {
             if (!Array.isArray(b.items) || !b.items.length || b.items.length > 100)
-                throw Error('Invoice requires 1–100 products');
+                throw Error('Invoice requires 1–100 line items');
             r.items = b.items.map(x => ({ description: String(x.description || '').trim().slice(0, 3000), quantity: Number(x.quantity), unit_price: Number(x.unit_price) }));
             if (r.items.some(x => !x.description || !Number.isFinite(x.quantity) || x.quantity <= 0 || !Number.isFinite(x.unit_price) || x.unit_price < 0))
                 throw Error('Invalid invoice quantity or rate');
         }
         if (!r.items?.length)
-            throw Error('Add at least one invoice product');
+            throw Error('Add at least one invoice line item');
         if (!r.seller_name?.trim())
             throw Error('Seller name is required');
         const subtotal = Math.round(r.items.reduce((sum, x) => sum + x.quantity * x.unit_price, 0) * 100) / 100;
@@ -368,13 +320,13 @@ function cleanSpecial(table, b, r) {
     else {
         if (Object.prototype.hasOwnProperty.call(b, 'items')) {
             if (!Array.isArray(b.items) || !b.items.length || b.items.length > 100)
-                throw Error('Delivery note requires 1–100 products');
+                throw Error('Delivery note requires 1–100 line items');
             r.items = b.items.map(x => ({ description: String(x.description || '').trim().slice(0, 3000), quantity: Number(x.quantity), unit: String(x.unit || '').trim().slice(0, 40), remarks: String(x.remarks || '').slice(0, 300), unit_price: 0 }));
             if (r.items.some(x => !x.description || !Number.isFinite(x.quantity) || x.quantity <= 0 || !x.unit))
-                throw Error('Delivery item needs a product, positive quantity and unit');
+                throw Error('Delivery item requires a description, positive quantity and unit');
         }
         if (!r.items?.length)
-            throw Error('Add at least one delivery product');
+            throw Error('Add at least one delivery item');
         if (!r.sender_name?.trim())
             throw Error('Sender company name is required');
         r.amount = 0;
@@ -382,6 +334,67 @@ function cleanSpecial(table, b, r) {
     }
     return r;
 }
+// Central registry is not the same worksheet as a company's own Clients table.
+// Master Clients A:M: only salted password hashes; no plaintext passwords.
+const REGISTRY_HEADERS = ['tenant_id','company_name','owner_name','email','password_salt','password_hash','phone','status','spreadsheet_id','created_at','provision_state','provisioned_at','provision_error'];
+function registryEnvironment(env) {
+    return { ...env, SPREADSHEET_ID: env.MASTER_SPREADSHEET_ID };
+}
+async function masterClients(env) {
+    if (!env.MASTER_SPREADSHEET_ID) throw Error('MASTER_SPREADSHEET_ID is not configured');
+    const access = await googleToken(env);
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(env.MASTER_SPREADSHEET_ID)}/values/${encodeURIComponent('Clients!A:M')}`;
+    // Authentication and approval MUST NOT use the cached or stale tenant records.
+    const response = await googleSheetsRequest(url, { headers: { authorization: `Bearer ${access}` } }, 'master Clients');
+    const rows = response.values || [];
+    if (!rows.length || REGISTRY_HEADERS.some((v,i)=>rows[0][i] !== v)) {
+        const err = Error('Master Clients headers are missing or mismatched. Run ALIF LABS master setup.');
+        err.status = 503;
+        throw err;
+    }
+    return rows.slice(1).map((r, i) => ({ row: i + 2, tenant_id: r[0] || '', company_name: r[1] || '', owner_name: r[2] || '', email: String(r[3] || '').trim().toLowerCase(), password_salt: r[4] || '', password_hash: r[5] || '', phone: r[6] || '', status: r[7] || '', spreadsheet_id: r[8] || '', created_at: r[9] || '', provision_state: r[10] || '', provisioned_at: r[11] || '', provision_error: r[12] || '' })).filter(r => r.tenant_id);
+}
+async function registerCompany(env, body) {
+    const company_name = String(body.company_name || '').trim().slice(0, 180);
+    const owner_name = String(body.owner_name || '').trim().slice(0, 120);
+    const email = String(body.email || '').trim().toLowerCase();
+    const phone = String(body.phone || '').trim().slice(0, 25);
+    const password = body.password;
+    if (company_name.length < 2 || owner_name.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 || !/^\+?[0-9 ()-]{7,25}$/.test(phone)) {
+        return { status: 400, error: 'Provide a valid company name, owner name, email and phone.' };
+    }
+    if (typeof password !== 'string' || password.length < 12 || password.length > 128) {
+        return { status: 400, error: 'Password must contain 12–128 characters.' };
+    }
+    const existing = await masterClients(env);
+    if (existing.some(r => r.email === email)) return { status: 409, error: 'This email is already registered.' };
+    const salt = b64(crypto.getRandomValues(new Uint8Array(24)));
+    const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
+    const derived = await crypto.subtle.deriveBits({ name:'PBKDF2', hash:'SHA-256', salt:enc.encode(salt), iterations:210000 }, keyMaterial, 256);
+    const tenant_id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const master = registryEnvironment(env);
+    await sheet(master, 'Clients', 'APPEND', 'A:M', { values: [[tenant_id, company_name, owner_name, email, salt, b64(derived), phone, 'Pending', '', now, 'Pending', '', '']] });
+    return { status: 201, message: 'Registration received. Your account is pending manual approval.' };
+}
+async function loginCompany(env, body) {
+    const email = String(body.email || body.username || '').trim().toLowerCase();
+    const tenant = (await masterClients(env)).find(r => r.email === email);
+    if (!tenant || !await passwordOK(tenant, body.password)) return { status: 401, error: 'Incorrect email or password.' };
+    if (tenant.status !== 'Active') return { status: 403, error: 'Your account is pending approval or inactive.' };
+    if (!tenant.spreadsheet_id || tenant.provision_state !== 'Ready') return { status: 503, error: 'Account approved; workspace provisioning is not complete. Please contact ALIF LABS support.' };
+    const payload = { tenant_id: tenant.tenant_id, username: tenant.email, role: 'admin', exp: Date.now() + 8 * 3600000 };
+    return { status: 200, token: await sign(payload, env.AUTH_SECRET), user: { username:tenant.email, company_name:tenant.company_name, role:'admin' } };
+}
+async function tenantSession(env, auth) {
+    const user = await verify(auth, env.AUTH_SECRET);
+    if (!user || user.role !== 'admin' || !user.tenant_id) return null;
+    const tenant = (await masterClients(env)).find(r => r.tenant_id === user.tenant_id && r.email === user.username);
+    if (!tenant || tenant.status !== 'Active' || tenant.provision_state !== 'Ready' || !tenant.spreadsheet_id) return null;
+    // The browser cannot supply or override this ID: every business route is scoped server-side.
+    return { user, tenant, tenantEnv: { ...env, SPREADSHEET_ID: tenant.spreadsheet_id } };
+}
+
 function errorStatus(message) { return /not found/i.test(message) ? 404 : /permission|not allowed|locked|forbidden/i.test(message) ? 403 : /invalid|required|too many|select|not accessible|brand/i.test(message) ? 400 : 500; }
 export default { async fetch(req, env) {
         const url = new URL(req.url);
@@ -395,22 +408,24 @@ export default { async fetch(req, env) {
         try {
             if (url.pathname === '/api/health')
                 return reply({ ok: true }, 200, origin);
-            if (!env.AUTH_SECRET || !env.USERS_JSON || !env.SPREADSHEET_ID || !env.SERVICE_ACCOUNT_JSON)
-                throw Error('Backend secrets are not configured');
+            if (!env.AUTH_SECRET || !env.MASTER_SPREADSHEET_ID || !env.SERVICE_ACCOUNT_JSON)
+                throw Error('Backend master configuration is missing');
+            if (url.pathname === '/api/register' && req.method === 'POST') {
+                const result = await registerCompany(env, await req.json());
+                return reply(result, result.status, origin);
+            }
             if (url.pathname === '/api/login' && req.method === 'POST') {
-                const b = await req.json(), users = parseJSON(env.USERS_JSON, []);
-                const u = Array.isArray(users) ? users.find(x => x.username === b.username) : null;
-                if (!u || !ROLES[u.role] || !await passwordOK(u, b.password))
-                    return reply({ error: 'Invalid credentials' }, 401, origin);
-                const p = { username: u.username, role: u.role, exp: Date.now() + 8 * 3600000 };
-                return reply({ token: await sign(p, env.AUTH_SECRET), user: { username: p.username, role: p.role } }, 200, origin);
+                const result = await loginCompany(env, await req.json());
+                return reply(result, result.status, origin);
             }
             const auth = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
-            const user = await verify(auth, env.AUTH_SECRET);
-            if (!user || !ROLES[user.role])
-                return reply({ error: 'Session expired or unauthorized' }, 401, origin);
+            const session = await tenantSession(env, auth);
+            if (!session) return reply({ error: 'Session expired, account inactive or workspace unavailable' }, 401, origin);
+            const { user, tenant } = session;
+            // All later functions use the tenant-specific sheet, never the central registry.
+            env = session.tenantEnv;
             if (url.pathname === '/api/me')
-                return reply({ user: { username: user.username, role: user.role } }, 200, origin);
+                return reply({ user: { username: user.username, role:'admin', company_name:tenant.company_name } }, 200, origin);
             if (url.pathname === '/api/company-settings') {
                 if (req.method === 'GET')
                     return reply({ company: await getCompanySettings(env) }, 200, origin);
@@ -426,38 +441,7 @@ export default { async fetch(req, env) {
                 }
                 return reply({ error: 'Method not allowed' }, 405, origin);
             }
-            if (url.pathname === '/api/products' || url.pathname.startsWith('/api/products/')) {
-                const parts = url.pathname.split('/').filter(Boolean), id = parts[2];
-                const permission = { GET: 'read', POST: 'create', PATCH: 'update', DELETE: 'delete' }[req.method];
-                if (!permission || !ROLES[user.role].includes(permission))
-                    return reply({ error: 'Permission denied' }, 403, origin);
-                await ensureProducts(env);
-                const raw = await productApi(env), products = productRows(raw.values);
-                if (req.method === 'GET' && !id) {
-                    const q = String(url.searchParams.get('q') || '').trim().toLowerCase();
-                    return reply({ products: products.filter(p => !q || [p.name, p.brand, p.sku].some(v => v.toLowerCase().includes(q))).map(({ row, ...p }) => p) }, 200, origin);
-                }
-                if (req.method === 'POST' && !id) {
-                    const p = productPayload(await req.json());
-                    if (p.sku && products.some(x => x.sku.toUpperCase() === p.sku))
-                        return reply({ error: 'SKU / Item Code already exists' }, 409, origin);
-                    await productApi(env, 'APPEND', 'A:G', { values: [productValues(p)] });
-                    const logged = await audit(env, user, 'create', 'Products', { id: p.id, reference: p.sku });
-                    return reply({ product: p, audit_warning: !logged }, 201, origin);
-                }
-                if ((req.method === 'PATCH' || req.method === 'DELETE') && id) {
-                    const old = products.find(x => x.id === id);
-                    if (!old)
-                        return reply({ error: 'Product not found' }, 404, origin);
-                    const p = req.method === 'DELETE' ? { ...old, status: 'Deleted', updated_at: new Date().toISOString() } : productPayload(await req.json(), old);
-                    if (req.method === 'PATCH' && p.sku && products.some(x => x.id !== id && x.sku.toUpperCase() === p.sku))
-                        return reply({ error: 'SKU / Item Code already exists' }, 409, origin);
-                    await productApi(env, 'PUT', `A${old.row}:G${old.row}`, { values: [productValues(p)] });
-                    const logged = await audit(env, user, req.method === 'DELETE' ? 'archive' : 'update', 'Products', { id: p.id, reference: p.sku });
-                    return reply({ product: p, audit_warning: !logged }, 200, origin);
-                }
-                return reply({ error: 'Unsupported Products request' }, 405, origin);
-            }
+            // Legacy Products endpoints intentionally removed; historical sheet data is untouched.
             if (url.pathname === '/api/overview' && req.method === 'GET') {
                 const all = await Promise.all(TABLES.map(t => records(env, t)));
                 const counts = Object.fromEntries(TABLES.map((t, i) => [t, all[i].filter(r => visible(user, r)).length]));
@@ -502,6 +486,8 @@ export default { async fetch(req, env) {
                 return reply({ records: data.filter(r => visible(user, r) && (!q || JSON.stringify(r).toLowerCase().includes(q))).slice(0, 1000).map(({ row, brand_id, ...r }) => r) }, 200, origin);
             }
             if (req.method === 'POST' && !id) {
+                if (table === 'Invoices' && env.ALLOW_TAX_INVOICE_ISSUANCE !== 'true')
+                    return reply({ error: 'Tax invoice issuance is unavailable until compliance onboarding is complete.' }, 503, origin);
                 const b = await req.json();
                 if (table === 'Clients')
                     validateClient(b);
@@ -528,6 +514,8 @@ export default { async fetch(req, env) {
             if ((req.method === 'PATCH' || req.method === 'DELETE') && id) {
                 const data = await records(env, table);
                 const old = data.find(r => r.id === id && visible(user, r));
+                if (table === 'Invoices' && old && old.status !== 'Draft')
+                    return reply({ error: 'Issued invoices cannot be modified or deleted. Use a documented correction workflow.' }, 403, origin);
                 if (!old)
                     return reply({ error: 'Record not found' }, 404, origin);
                 if (req.method === 'DELETE' && user.role !== 'admin')
@@ -536,7 +524,7 @@ export default { async fetch(req, env) {
                 if (table === 'Clients' && req.method === 'PATCH')
                     validateClient({ ...old, ...b });
                 if (user.role !== 'admin' && table === 'Clients' && 'name' in b && b.name !== old.name)
-                    return reply({ error: 'Client name is locked for managers' }, 403, origin);
+                    return reply({ error: 'Client name modification not allowed' }, 403, origin);
                 if (user.role !== 'admin' && DOCS.includes(table) && (('client_id' in b && b.client_id !== old.client_id) || ('name' in b && b.name !== old.name)))
                     return reply({ error: 'Only admin can change the document client/name' }, 403, origin);
                 if (req.method === 'PATCH' && b.status === 'Deleted')
