@@ -37,7 +37,7 @@ function safeEqual(a, b) { if (typeof a !== 'string' || typeof b !== 'string')
 async function passwordOK(u, password) { if (typeof password !== 'string' || password.length > 256)
     return false; if (u.password_hash && u.password_salt) {
     const raw = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
-    const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: enc.encode(u.password_salt), iterations: 210000 }, raw, 256);
+    const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: enc.encode(u.password_salt), iterations: 100000 }, raw, 256);
     return safeEqual(b64(bits), u.password_hash);
 } return !!u.password && safeEqual(u.password, password); }
 async function googleToken(env) { if (tokenCache.value && Date.now() < tokenCache.expires)
@@ -370,7 +370,7 @@ async function registerCompany(env, body) {
     if (existing.some(r => r.email === email)) return { status: 409, error: 'This email is already registered.' };
     const salt = b64(crypto.getRandomValues(new Uint8Array(24)));
     const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
-    const derived = await crypto.subtle.deriveBits({ name:'PBKDF2', hash:'SHA-256', salt:enc.encode(salt), iterations:210000 }, keyMaterial, 256);
+    const derived = await crypto.subtle.deriveBits({ name:'PBKDF2', hash:'SHA-256', salt:enc.encode(salt), iterations:100000 }, keyMaterial, 256);
     const tenant_id = crypto.randomUUID();
     const now = new Date().toISOString();
     const master = registryEnvironment(env);
