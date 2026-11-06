@@ -499,3 +499,45 @@
 @keyframes cinematicStars{to{background-position:92px 124px,167px 176px}}
 @media(max-width:600px){.cinematic-public .alif-theme-toggle{padding:0 9px;min-height:36px}.cinematic-public .alif-theme-toggle span{display:none}.cinematic-symbol{height:260px}.cinematic-public .alif-nav-buttons{gap:5px}.cinematic-public .alif-signature-art{height:320px}}
 @media(prefers-reduced-motion:reduce){.cinematic-public *, .cinematic-public *::before,.cinematic-public *::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}.cinematic-draw{stroke-dashoffset:0}}
+
+/* Option 4 — Liquid Metal Flow, responsive CSS/SVG animation with no external rendering dependency */
+.liquid-stage{overflow:hidden;min-height:475px}
+.liquid-aura{position:absolute;width:80%;height:80%;left:10%;top:8%;background:radial-gradient(ellipse,rgba(57,146,248,.25),transparent 65%);filter:blur(28px);animation:liquidAura 8s ease-in-out infinite alternate}
+.liquid-sculpture{position:relative;z-index:2;width:min(100%,560px);height:445px;transform:rotateY(calc(var(--pointer-x,0)*9deg)) rotateX(calc(var(--pointer-y,0)*-7deg));transition:transform .3s ease;animation:liquidHover 6s ease-in-out infinite;filter:drop-shadow(0 16px 24px rgba(80,159,245,.3))}
+.liquid-svg{width:100%;height:100%;overflow:visible}
+.liquid-ribbon{transform-origin:50% 55%;animation:liquidBreathe 8s ease-in-out infinite alternate}
+.ribbon-two{animation-delay:-2.3s;animation-duration:7s}.ribbon-three{animation-delay:-4s;animation-duration:9s}
+.liquid-glint{stroke-dasharray:190 620;stroke-dashoffset:810;animation:liquidGlint 5.5s linear infinite}.glint-two{animation-delay:-2.8s}
+.liquid-drop{transform-box:fill-box;transform-origin:center;animation:liquidDroplet 5s ease-in-out infinite}.drop-two{animation-delay:-2s}.drop-three{animation-delay:-3.5s}
+.liquid-halo{position:absolute;border:1px solid rgba(149,201,255,.37);width:68%;height:26%;left:16%;top:53%;border-radius:50%;transform:rotate(-16deg);box-shadow:0 0 25px rgba(63,153,243,.14);animation:liquidRing 12s ease-in-out infinite alternate}
+.halo-back{z-index:1;opacity:.5}.halo-front{z-index:3;pointer-events:none;clip-path:inset(58% 0 0 0);opacity:.7}
+.liquid-pedestal{position:absolute;bottom:60px;left:23%;width:54%;height:42px;border:2px solid rgba(131,196,255,.35);border-radius:50%;box-shadow:0 0 34px rgba(76,158,246,.2),inset 0 0 28px rgba(76,158,246,.12)}
+.liquid-stage .alif-art-caption{z-index:4;bottom:0}
+.cinematic-public[data-public-theme="light"] .liquid-aura{background:radial-gradient(ellipse,rgba(62,132,210,.19),transparent 68%)}
+.nav-group-trigger{width:100%;text-align:left}.nav-group-trigger .group-chevron{margin-left:auto;transition:transform .2s}.group-chevron.open{transform:rotate(90deg)}
+.nav-submenu{padding-left:14px;border-left:1px solid var(--border,rgba(150,165,188,.22));margin-left:17px}.nav-submenu .nav-link{font-size:13px}
+.side-profile .brand-text{min-width:0}.side-profile .brand-text b,.side-profile .brand-text small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:185px}
+.topbar-identity{display:flex;flex-direction:column;text-align:right;max-width:220px;min-width:0}.topbar-identity strong,.topbar-identity small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.topbar-identity strong{font-size:12px}.topbar-identity small{font-size:10px;opacity:.7}
+.brand-logo .brand-text strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;display:block}
+@keyframes liquidAura{to{transform:scale(1.16);opacity:.58}}
+@keyframes liquidHover{50%{translate:0 -16px}}
+@keyframes liquidBreathe{to{transform:scale(1.035) rotate(1.4deg)}}
+@keyframes liquidGlint{to{stroke-dashoffset:-810}}
+@keyframes liquidDroplet{50%{transform:translateY(-23px) scale(.8);opacity:.55}}
+@keyframes liquidRing{to{transform:rotate(14deg) scale(1.09)}}
+@media(max-width:600px){.liquid-stage{min-height:310px}.liquid-sculpture{height:285px}.liquid-pedestal{bottom:45px}.topbar-identity{display:none}.nav-submenu{margin-left:9px}}
+@media(prefers-reduced-motion:reduce){.liquid-stage *,.liquid-stage *::before,.liquid-stage *::after{animation:none!important;transition:none!important}.liquid-glint{stroke-dasharray:none;stroke-dashoffset:0}}
+
+/* Option 5 — DIGITAL CITY: animated projected glass architecture, not typography or dot art. */
+.city-stage{overflow:hidden;min-height:475px;isolation:isolate}
+.digital-city-scene{position:absolute;inset:0;overflow:hidden;z-index:1;background:radial-gradient(ellipse at 52% 48%,rgba(16,66,123,.38),transparent 65%)}
+.digital-city-canvas{display:block;width:100%;height:100%;filter:drop-shadow(0 0 16px rgba(45,143,245,.23))}
+.digital-city-haze{position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,transparent 40%,rgba(15,62,118,.12) 70%,transparent 95%);animation:cityHaze 9s ease-in-out infinite alternate}
+.digital-city-reflection{position:absolute;bottom:0;left:12%;right:12%;height:20%;background:radial-gradient(ellipse,rgba(47,139,231,.18),transparent 70%);filter:blur(14px)}
+.city-caption{z-index:3!important;bottom:4px!important;text-shadow:0 2px 18px #020a16}
+.cinematic-public[data-public-theme="light"] .digital-city-scene{background:radial-gradient(ellipse at 52% 48%,rgba(64,142,229,.18),transparent 68%)}
+.cinematic-public[data-public-theme="light"] .digital-city-canvas{filter:drop-shadow(0 8px 18px rgba(44,106,182,.14))}
+.cinematic-public[data-public-theme="light"] .city-caption{text-shadow:0 2px 18px #fff}
+@keyframes cityHaze{to{opacity:.5;transform:translateY(-15px)}}
+@media(max-width:600px){.city-stage{min-height:320px}.digital-city-scene{inset:0 -12%}}
+@media(prefers-reduced-motion:reduce){.digital-city-haze{animation:none}}
