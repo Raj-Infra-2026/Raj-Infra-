@@ -30,88 +30,86 @@ function Carousel({ children, title, subtitle, compact = false }) { const track 
 function Flame({ small = false }) { return <div className={'flame-scene ' + (small ? 'small' : '')} aria-label="ALIF LABS signature"><div className="flame-halo"/><svg className="flame-svg" viewBox="0 0 160 185" role="img" aria-label="Abstract ascending flame"><defs><linearGradient id="flameGradient" x1="0" y1="1" x2="1" y2="0"><stop offset="0%" stopColor="var(--flame-low)"/><stop offset="52%" stopColor="var(--accent)"/><stop offset="100%" stopColor="var(--flame-high)"/></linearGradient></defs><path d="M84 7 C111 45 70 66 115 88 C154 116 135 161 95 175 C52 188 18 157 31 119 C39 98 67 82 58 47 C75 60 79 68 84 7Z" fill="url(#flameGradient)"/><path d="M85 75 C98 99 64 112 79 138 C87 148 106 150 102 165 C69 174 51 150 61 129 C69 108 82 102 85 75Z" fill="var(--hero-bg)" opacity=".76"/><path d="M85 18L93 50 79 72" fill="none" stroke="var(--flame-high)" strokeWidth="2" opacity=".8"/></svg><div className="flame-base"/></div>; }
 function AlifMonogram({ small = false }) { return <span className={'alif-monogram' + (small ? ' compact' : '')} aria-hidden="true"><span>A</span><i/></span>; }
 
-/**
- * Cinematic Digital Crown City — real approved concept artwork, not generated
- * geometry. A lightweight loop adds moving camera framing; CSS provides the
- * luminous depth, orbit, reflection and perspective. Video always has a poster
- * fallback and pauses while outside the viewport.
- */
-function CrownCityScene({ compact = false }) {
-  const stage = useRef(null);
-  const movie = useRef(null);
-
+/** A real-time illustrated 3D city, drawn with projected building geometry, not letters or particle dots. */
+function DigitalCity({ theme = 'dark' }) {
+  const canvasRef = useRef(null);
   useEffect(() => {
-    const el = stage.current;
-    const video = movie.current;
-    if (!el || !video) return;
-    const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
-    let visible = true;
-    let animationFrame = 0;
-    let enabled = !motion.matches;
-
-    const syncPlayback = () => {
-      if (!video) return;
-      if (!enabled || !visible || document.hidden) video.pause();
-      else video.play().catch(() => { /* keep static poster on blocked autoplay */ });
-    };
-    const onMotionChange = () => { enabled = !motion.matches; syncPlayback(); };
-    const onPointerMove = event => {
-      if (!enabled || event.pointerType === 'touch') return;
-      const bounds = el.getBoundingClientRect();
-      const x = Math.max(-1, Math.min(1, (event.clientX - bounds.left) / bounds.width * 2 - 1));
-      const y = Math.max(-1, Math.min(1, (event.clientY - bounds.top) / bounds.height * 2 - 1));
-      cancelAnimationFrame(animationFrame);
-      animationFrame = requestAnimationFrame(() => {
-        el.style.setProperty('--crown-tilt-x', `${(-y * 3.2).toFixed(2)}deg`);
-        el.style.setProperty('--crown-tilt-y', `${(x * 4.5).toFixed(2)}deg`);
-        el.style.setProperty('--crown-shift-x', `${(-x * 9).toFixed(1)}px`);
-        el.style.setProperty('--crown-shift-y', `${(-y * 7).toFixed(1)}px`);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d', { alpha: true });
+    if (!ctx) return;
+    let frame = 0, raf = 0, running = true;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const light = theme === 'light';
+    const rand = (n) => { const x = Math.sin(n * 127.1 + 13.77) * 43758.5453; return x - Math.floor(x); };
+    const towers = [];
+    for (let z = 0; z < 7; z++) {
+      for (let x = -6; x <= 6; x++) {
+        const seed = (z + 1) * 31 + (x + 7) * 17;
+        if (rand(seed) < .18 || (x === 0 && z < 4)) continue;
+        towers.push({ x: x * 1.12 + (rand(seed+4)-.5)*.26, z: z*1.12+.35, w:.53+rand(seed+1)*.45, d:.5+rand(seed+2)*.35, h:1.15+rand(seed+3)*3.2 + (z<2 ? .7:0), seed });
+      }
+    }
+    towers.push({x:0,z:2.45,w:1.13,d:1.04,h:7.2,seed:300,hero:true});
+    towers.sort((a,b)=>b.z-a.z);
+    const size = () => {const r=canvas.getBoundingClientRect(); const d=Math.min(window.devicePixelRatio||1,2);canvas.width=Math.max(1,Math.floor(r.width*d));canvas.height=Math.max(1,Math.floor(r.height*d));ctx.setTransform(d,0,0,d,0,0);return {w:r.width,h:r.height};};
+    let dims=size();
+    const observer=new ResizeObserver(()=>{dims=size();if(reduce)draw(0);});observer.observe(canvas);
+    const polygon=(pts,fill,stroke)=>{ctx.beginPath();pts.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.closePath();ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=.8;ctx.stroke();}};
+    const line=(a,b,color,width=1)=>{ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.strokeStyle=color;ctx.lineWidth=width;ctx.stroke();};
+    function draw(time){
+      const {w,h}=dims;if(!w||!h)return;ctx.clearRect(0,0,w,h);
+      const scale=Math.min(w/15.4,h/11.7), cy=h*.73, cx=w*.5;
+      const sway=reduce?0:Math.sin(time*.00018)*.12;
+      const proj=(x,y,z)=>{const a=.67+sway;return [cx+(x-z*.55)*scale*.94 + Math.sin(a)*z*scale*.08,cy+(x*.23+z*.35-y)*scale*.95];};
+      let halo=ctx.createRadialGradient(cx,cy-h*.26,2,cx,cy-h*.26,w*.55);
+      halo.addColorStop(0,light?'rgba(66,130,220,.24)':'rgba(40,135,240,.30)');halo.addColorStop(1,'rgba(10,30,80,0)');ctx.fillStyle=halo;ctx.fillRect(0,0,w,h);
+      // Illuminated holographic floor, rendered behind every tower.
+      for(let i=0;i<5;i++){ctx.beginPath();ctx.ellipse(cx,cy+10,scale*(4.8+i*.55),scale*(.94+i*.11),0,0,Math.PI*2);ctx.strokeStyle=light?'rgba(27,105,192,.13)':'rgba(75,176,255,.18)';ctx.lineWidth=i===0?2:1;ctx.stroke();}
+      for(let k=-8;k<=8;k++){line(proj(k,0,0),proj(k,0,8),light?'rgba(60,125,205,.10)':'rgba(84,177,255,.14)');}
+      for(let k=0;k<=8;k++){line(proj(-8,0,k),proj(8,0,k),light?'rgba(60,125,205,.10)':'rgba(84,177,255,.14)');}
+      towers.forEach(t=>{
+        const {x,z,w:tw,d,seed,hero}=t;let height=t.h;
+        const a=proj(x-tw/2,0,z-d/2),b=proj(x+tw/2,0,z-d/2),c=proj(x+tw/2,0,z+d/2),e=proj(x-tw/2,0,z+d/2);
+        const A=proj(x-tw/2,height,z-d/2),B=proj(x+tw/2,height,z-d/2),C=proj(x+tw/2,height,z+d/2),E=proj(x-tw/2,height,z+d/2);
+        const base=hero?['#071f3e','#103d70','#1b5b9b']:light?['#53799e','#7698b9','#a9c9e4']:['#0a2546','#153c67','#235486'];
+        polygon([a,b,B,A],base[0],hero?'#79caff70':'#8acbff26');
+        polygon([b,c,C,B],base[1],hero?'#a9dfff99':'#8acbff38');
+        polygon([e,a,A,E],base[0]);
+        polygon([A,B,C,E],base[2],hero?'#b4f4ff':'#7dbcfb80');
+        // Facade glass panes, horizontal floor seams and bright windows.
+        const floors=Math.max(3,Math.floor(height*4));
+        for(let j=1;j<floors;j++){
+          const y=height*j/floors;
+          line(proj(x+tw/2,y,z-d/2),proj(x+tw/2,y,z+d/2),hero?'rgba(137,218,255,.46)':'rgba(123,196,251,.21)',.7);
+          line(proj(x-tw/2,y,z-d/2),proj(x+tw/2,y,z-d/2),'rgba(137,218,255,.12)',.6);
+          for(let k=0;k<3;k++){
+            const zz=z-d/2+d*(k+.5)/3;
+            if(rand(seed*7+j*13+k*11)>.29){
+              const left=proj(x+tw/2+.008,y-.035,zz-.065),right=proj(x+tw/2+.008,y+.065,zz+.065);
+              polygon([left,proj(x+tw/2+.008,y+.065,zz-.065),right,proj(x+tw/2+.008,y-.035,zz+.065)],hero?'rgba(177,239,255,.84)':(j+k)%3===0?'rgba(255,193,111,.75)':'rgba(94,192,255,.63)');
+            }
+          }
+        }
+        for(let k=1;k<4;k++){const zz=z-d/2+d*k/4;line(proj(x+tw/2,0,zz),proj(x+tw/2,height,zz),'rgba(149,220,255,.20)',.7);}
+        if(hero){
+          const tip=proj(x,height+.82,z),roof=proj(x,height,z);
+          line(roof,tip,'#b6f4ff',2);ctx.beginPath();ctx.arc(...tip,3,0,Math.PI*2);ctx.fillStyle='#e9ffff';ctx.fill();
+          ctx.save();ctx.shadowColor='#53dfff';ctx.shadowBlur=22;line(proj(x+tw/2,0,z+d/2),proj(x+tw/2,height,z+d/2),'#81e7ff',2.4);ctx.restore();
+        }
       });
-    };
-    const onPointerLeave = () => {
-      cancelAnimationFrame(animationFrame);
-      el.style.setProperty('--crown-tilt-x','0deg');
-      el.style.setProperty('--crown-tilt-y','0deg');
-      el.style.setProperty('--crown-shift-x','0px');
-      el.style.setProperty('--crown-shift-y','0px');
-    };
-    const observer = new IntersectionObserver(entries => {
-      visible = !!entries[0]?.isIntersecting;
-      syncPlayback();
-    }, { threshold: .06 });
-    observer.observe(el);
-    el.addEventListener('pointermove', onPointerMove, { passive: true });
-    el.addEventListener('pointerleave', onPointerLeave);
-    document.addEventListener('visibilitychange', syncPlayback);
-    motion.addEventListener?.('change', onMotionChange);
-    syncPlayback();
-    return () => {
-      observer.disconnect();
-      cancelAnimationFrame(animationFrame);
-      el.removeEventListener('pointermove', onPointerMove);
-      el.removeEventListener('pointerleave', onPointerLeave);
-      document.removeEventListener('visibilitychange', syncPlayback);
-      motion.removeEventListener?.('change', onMotionChange);
-      video.pause();
-    };
-  }, []);
-
-  return <div ref={stage} className={'crown-city-scene' + (compact ? ' crown-city-scene--compact' : '')} role="img" aria-label="Cinematic golden digital crown city: a realistic illuminated futuristic city rising from clouds with animated sweeping light rings">
-    <div className="crown-city-frame" aria-hidden="true">
-      <img className="crown-city-poster" src="/media/digital-crown-city.webp" alt="" draggable="false"/>
-      <video ref={movie} className="crown-city-film" autoPlay muted playsInline loop preload="metadata" poster="/media/digital-crown-city.webp" aria-hidden="true" tabIndex={-1}>
-        <source src="/media/digital-crown-city.mp4" type="video/mp4"/>
-      </video>
-    </div>
-    <div className="crown-city-vignette" aria-hidden="true"/>
-    <div className="crown-city-beam" aria-hidden="true"/>
-    <div className="crown-city-orbit crown-city-orbit--near" aria-hidden="true"/>
-    <div className="crown-city-orbit crown-city-orbit--far" aria-hidden="true"/>
-    <div className="crown-city-light crown-city-light--one" aria-hidden="true"/>
-    <div className="crown-city-light crown-city-light--two" aria-hidden="true"/>
-    <div className="crown-city-edge" aria-hidden="true"/>
-    {!compact && <div className="crown-city-brand"><span className="crown-city-brand-rule"/> <strong>ALIF LABS</strong><small>THE DIGITAL CROWN · ENGINEERING TOMORROW</small></div>}
-  </div>;
+      // Sweeping circular energy tracks and moving light pulses.
+      ctx.save();ctx.translate(cx,cy+10);ctx.scale(1,.24);
+      for(let r=0;r<3;r++){ctx.beginPath();ctx.ellipse(0,0,scale*(5.5+r*.5),scale*(3.4+r*.3),0,0,Math.PI*2);ctx.strokeStyle=light?'rgba(28,112,205,.35)':'rgba(56,173,255,.46)';ctx.lineWidth=r===0?4:2;ctx.stroke();}
+      for(let r=0;r<4;r++){const angle=time*.0003+r*1.57;ctx.beginPath();ctx.arc(0,0,scale*5.5,angle,angle+.25);ctx.strokeStyle=r%2?'#ffbf77':'#90ecff';ctx.shadowColor=ctx.strokeStyle;ctx.shadowBlur=16;ctx.lineWidth=5;ctx.stroke();}ctx.restore();
+      // Atmospheric aerial lights: a subtle moving skyline, never a static glyph.
+      for(let i=0;i<5;i++){const xx=(.16+i*.18+Math.sin(time*.00015+i)*.03)*w,yy=(.18+rand(i+1)*.25)*h;ctx.beginPath();ctx.arc(xx,yy,i%2?1.6:2.4,0,Math.PI*2);ctx.fillStyle=i%2?'#ffcf93':'#b7efff';ctx.shadowBlur=12;ctx.shadowColor=ctx.fillStyle;ctx.fill();}ctx.shadowBlur=0;
+    }
+    function tick(t){if(!running)return;frame++;if(frame%2===0)draw(t);raf=requestAnimationFrame(tick);}
+    draw(0);if(!reduce)raf=requestAnimationFrame(tick);
+    return ()=>{running=false;cancelAnimationFrame(raf);observer.disconnect();};
+  },[theme]);
+  return <div className="digital-city-scene"><div className="digital-city-haze"/><canvas ref={canvasRef} className="digital-city-canvas" role="img" aria-label="Animated futuristic three-dimensional glass skyscraper city with glowing windows, illuminated roads, and a central landmark tower"/><div className="digital-city-reflection"/></div>;
 }
 
 function PublicPortal({ onLogin, onRegister, busy, error }) {
@@ -119,6 +117,8 @@ function PublicPortal({ onLogin, onRegister, busy, error }) {
     const [screen, setScreen] = useState(pathToScreen);
     const [publicTheme, setPublicTheme] = useState(() => { try { return localStorage.getItem('alif-public-theme') === 'light' ? 'light' : 'dark'; } catch { return 'dark'; } });
     useEffect(() => { try { localStorage.setItem('alif-public-theme', publicTheme); } catch {} }, [publicTheme]);
+    const [pointer, setPointer] = useState({x:0,y:0});
+    const moveSignature = e => { if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return; const r=e.currentTarget.getBoundingClientRect(); setPointer({x:Math.max(-1,Math.min(1,(e.clientX-r.left)/r.width*2-1)),y:Math.max(-1,Math.min(1,(e.clientY-r.top)/r.height*2-1))}); };
     const [email, setEmail] = useState(''), [password, setPassword] = useState('');
     const [registration, setRegistration] = useState({ company_name:'', owner_name:'', email:'', phone:'', password:'', confirm_password:'' });
     const [notice, setNotice] = useState('');
@@ -147,11 +147,11 @@ function PublicPortal({ onLogin, onRegister, busy, error }) {
             <div className="alif-hero-actions"><button type="button" className="alif-gold large" onClick={()=>switchScreen('register')}>Create your workspace <ArrowRight size={19}/></button><button type="button" className="alif-outline large" onClick={()=>switchScreen('login')}>Already a client? Sign in</button></div>
             <div className="alif-hero-foot"><span><ShieldCheck size={17}/> Private company workspace</span><span><CheckCircle2 size={17}/> Registration by approval</span></div>
           </div>
-          <div className="alif-signature-art crown-city-stage"><CrownCityScene/></div>
+          <div className="alif-signature-art cinematic-signature city-stage" aria-label="Animated three-dimensional illuminated futuristic digital city"><DigitalCity theme={publicTheme}/><div className="alif-art-caption city-caption">ALIF <span>LABS</span><small>ENGINEERING TOMORROW</small></div></div>
         </main>
         <section id="platform" className="alif-feature-band"><div className="alif-feature-card"><Receipt size={25}/><h3>Intelligent invoicing</h3><p>Manual descriptions, clear totals and elegantly structured documents.</p></div><div className="alif-feature-card"><Users size={25}/><h3>Connected client records</h3><p>Keep every customer, quotation and operation within reach.</p></div><div className="alif-feature-card"><Building2 size={25}/><h3>Your own workspace</h3><p>Your company information stays in a separate, private Google Spreadsheet.</p></div></section>
         <section id="why-alif" className="alif-bottom-statement"><span>THE ALIF LABS PROMISE</span><h2>One platform. Your business at the center.</h2><button className="alif-gold" onClick={()=>switchScreen('register')}>Register your company <ArrowRight size={16}/></button></section>
-      </> : <main className="alif-access-area"><div className="alif-access-intro"><div className="cinematic-access-emblem"><AlifMonogram/><span className="cinematic-emblem-ring"/></div><span className="alif-kicker">THE ALIF LABS WORKSPACE</span><h1>{screen === 'register' ? 'Start something exceptional.' : screen === 'success' ? 'Your request is in.' : 'Welcome back.'}</h1><p>{screen === 'register' ? 'Register your company. Once approved, your private business workspace is created automatically.' : screen === 'success' ? 'Your ALIF LABS account is awaiting administrator approval. You can sign in once your workspace has been activated.' : 'Access your company’s private, connected operating platform.'}</p><CrownCityScene compact/></div>
+      </> : <main className="alif-access-area"><div className="alif-access-intro"><div className="cinematic-access-emblem"><AlifMonogram/><span className="cinematic-emblem-ring"/></div><span className="alif-kicker">THE ALIF LABS WORKSPACE</span><h1>{screen === 'register' ? 'Start something exceptional.' : screen === 'success' ? 'Your request is in.' : 'Welcome back.'}</h1><p>{screen === 'register' ? 'Register your company. Once approved, your private business workspace is created automatically.' : screen === 'success' ? 'Your ALIF LABS account is awaiting administrator approval. You can sign in once your workspace has been activated.' : 'Access your company’s private, connected operating platform.'}</p></div>
         <div className="alif-access-card">
           {screen === 'login' ? <form onSubmit={e=>{e.preventDefault();onLogin(email,password);}}><span className="alif-form-eyebrow">COMPANY LOGIN</span><h2>Sign in</h2><label>Email address<input required type="email" autoComplete="username" placeholder="you@company.com" value={email} onChange={e=>setEmail(e.target.value)}/></label><label>Password<input required type="password" autoComplete="current-password" placeholder="Your password" value={password} onChange={e=>setPassword(e.target.value)}/></label>{error && <p className="alif-error" role="alert">{error}</p>}<button className="alif-gold wide" disabled={busy} type="submit">{busy?'Signing in…':'Open my workspace'} <ArrowRight size={18}/></button><p className="alif-switch">New to ALIF LABS? <button type="button" onClick={()=>switchScreen('register')}>Register your company</button></p></form>
           : screen === 'register' ? <form onSubmit={submitRegistration}><span className="alif-form-eyebrow">COMPANY REGISTRATION</span><h2>Get started</h2><label>Registered company name<input required minLength={2} maxLength={180} autoComplete="organization" value={registration.company_name} onChange={e=>update('company_name',e.target.value)} placeholder="Company name"/></label><label>Owner / contact name<input required minLength={2} maxLength={120} autoComplete="name" value={registration.owner_name} onChange={e=>update('owner_name',e.target.value)} placeholder="Full name"/></label><label>Business email<input required type="email" autoComplete="email" value={registration.email} onChange={e=>update('email',e.target.value)} placeholder="owner@company.com"/></label><label>Phone number<input required type="tel" autoComplete="tel" value={registration.phone} onChange={e=>update('phone',e.target.value)} placeholder="+966 50 000 0000"/></label><div className="alif-form-two"><label>Create password<input required type="password" minLength={12} maxLength={128} autoComplete="new-password" value={registration.password} onChange={e=>update('password',e.target.value)} placeholder="12+ characters"/></label><label>Confirm password<input required type="password" minLength={12} maxLength={128} autoComplete="new-password" value={registration.confirm_password} onChange={e=>update('confirm_password',e.target.value)} placeholder="Repeat password"/></label></div>{(notice||error) && <p className="alif-error" role="alert">{notice || error}</p>}<button className="alif-gold wide" disabled={busy} type="submit">{busy?'Submitting…':'Request access'} <ArrowRight size={18}/></button><p className="alif-switch">Have an account? <button type="button" onClick={()=>switchScreen('login')}>Log in</button></p></form>
