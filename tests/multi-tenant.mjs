@@ -56,9 +56,24 @@ try {
  assert.equal((await call('/records/Clients','GET',alice)).data.records.length,1);
  assert.equal((await call('/records/Clients','GET',bob)).data.records.length,0);
  assert.equal((await call('/products','GET',alice)).status,404);
- assert.equal((await call('/records/Invoices','POST',alice,{name:'Test'})).status,503);
+ const createdInvoice = await call('/records/Invoices','POST',alice,{
+   name:'Customer One',client_id:add.data.record.id,date:'2026-11-03',invoice_time:'10:30',
+   status:'Active',seller_name:'Alpha Trading',seller_vat:'300000000000003',
+   items:[{description:'Consulting',quantity:2,unit_price:250}]
+ });
+ assert.equal(createdInvoice.status,201,JSON.stringify(createdInvoice.data));
+ assert.equal(createdInvoice.data.record.invoice_timestamp,'2026-11-03T10:30:00+03:00');
+ const editedInvoice = await call('/records/Invoices/'+createdInvoice.data.record.id,'PATCH',alice,{
+   date:'2026-11-01',invoice_time:'14:45',items:[{description:'Consulting',quantity:2,unit_price:300}]
+ });
+ assert.equal(editedInvoice.status,200,JSON.stringify(editedInvoice.data));
+ assert.equal(editedInvoice.data.record.invoice_timestamp,'2026-11-01T14:45:00+03:00');
+ assert.equal(editedInvoice.data.record.amount,690);
+ assert.equal(editedInvoice.data.record.revision_history.length,1);
+ assert.equal((await call('/records/Invoices/'+createdInvoice.data.record.id,'PATCH',bob,{date:'2026-11-02'})).status,404);
+ assert.equal((await call('/records/Invoices','GET',alice)).data.records[0].invoice_time,'14:45');
  master[1][7]='Suspended';
  assert.equal((await call('/records/Clients','GET',alice)).status,401);
  assert.equal((await call('/records/Clients','GET',bob)).status,200);
- console.log('PASS: register, salted passwords, duplicate, pending, provisioning, login, isolation, block products/tax issuance, live suspension');
+ console.log('PASS: register, salted passwords, duplicate, pending, provisioning, login, isolation, block products, allow invoice revisions, live suspension');
 } finally { globalThis.fetch=fetchOriginal; }

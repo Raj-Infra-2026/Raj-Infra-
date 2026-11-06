@@ -29,7 +29,7 @@ const displayInvoiceDateTime = doc => {
 };
 const saudiToday = () => new Intl.DateTimeFormat('sv-SE', {timeZone:'Asia/Riyadh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const saudiTime = () => new Intl.DateTimeFormat('en-GB', {timeZone:'Asia/Riyadh',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date());
-function zatcaPayload(doc) {
+function invoiceQrPayload(doc) {
     if (!doc.seller_name || !doc.seller_vat || !/^[0-9]{15}$/.test(doc.seller_vat))
         return '';
     const fields = [doc.seller_name, doc.seller_vat, invoiceTimestamp(doc), num(doc.amount).toFixed(2), num(doc.vat_amount).toFixed(2)];
@@ -60,7 +60,7 @@ export function printBusinessDocument(doc, kind = 'Invoices', preview = false, t
     const totals = invoiceTotals(items, doc.adjustments);
     const amount = isInvoice ? Number(doc.amount ?? totals.total) : 0;
     const adjustmentRows = isInvoice ? (doc.adjustments || []).map(row => `<div><span>${safe(row.type)}</span><b>${safe(sar(adjustmentValue(row)))}</b></div>`).join('') : '';
-    const qr = isInvoice ? qrSvg(zatcaPayload({ ...doc, amount, vat_amount: doc.vat_amount ?? totals.vat })) : '';
+    const qr = isInvoice ? qrSvg(invoiceQrPayload({ ...doc, amount, vat_amount: doc.vat_amount ?? totals.vat })) : '';
     const rowItems = items.map((x, i) => isInvoice ? `<tr><td>${i + 1}</td><td class="description-cell">${safe(x.description || '').replace(/\n/g, '<br>')}</td><td>${safe(x.quantity)}</td><td>${safe(sar(x.unit_price))}</td><td>${safe(sar(Number(x.quantity) * Number(x.unit_price)))}</td></tr>` : `<tr><td>${i + 1}</td><td>${safe(x.description || '')}</td><td>${safe(x.quantity)}</td><td>${safe(x.unit || '')}</td><td>${safe(x.remarks || '')}</td></tr>`).join('');
     const sender = isInvoice ? { name: doc.seller_name, address: doc.seller_address, vat: doc.seller_vat, cr: doc.seller_cr, phone: doc.seller_phone, email: doc.seller_email } : { name: doc.sender_name, address: doc.sender_address, vat: doc.sender_vat, cr: doc.sender_cr, phone: doc.sender_phone, email: doc.sender_email };
     const receiver = { name: doc.buyer_name || doc.receiver_name || doc.name, address: doc.buyer_address || doc.receiver_address, vat: doc.buyer_vat || doc.receiver_vat };
