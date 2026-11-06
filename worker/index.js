@@ -521,9 +521,10 @@ export default { async fetch(req, env) {
                 return reply({ records: data.filter(r => visible(user, r) && (!q || JSON.stringify(r).toLowerCase().includes(q))).slice(0, 1000).map(({ row, brand_id, ...r }) => r) }, 200, origin);
             }
             if (req.method === 'POST' && !id) {
-                if (table === 'Invoices' && env.ALLOW_TAX_INVOICE_ISSUANCE !== 'true')
-                    return reply({ error: 'Tax invoice issuance is unavailable until compliance onboarding is complete.' }, 503, origin);
                 const b = await req.json();
+                // Stage 1.3 has no compliant issuance workflow: permit draft creation only.
+                if (table === 'Invoices' && b.status !== 'Draft')
+                    return reply({ error: 'Only Draft invoices can be saved until ZATCA onboarding and issuance integration are complete.' }, 403, origin);
                 if (table === 'Clients')
                     validateClient(b);
                 const rec = cleanSpecial(table, b, clean(b, user, null));
@@ -562,6 +563,8 @@ export default { async fetch(req, env) {
                     return reply({ error: 'Client name modification not allowed' }, 403, origin);
                 if (user.role !== 'admin' && DOCS.includes(table) && (('client_id' in b && b.client_id !== old.client_id) || ('name' in b && b.name !== old.name)))
                     return reply({ error: 'Only admin can change the document client/name' }, 403, origin);
+                if (table === 'Invoices' && req.method === 'PATCH' && b.status !== undefined && b.status !== 'Draft')
+                    return reply({ error: 'Drafts cannot be issued or moved to another status until ZATCA onboarding is complete.' }, 403, origin);
                 if (req.method === 'PATCH' && b.status === 'Deleted')
                     return reply({ error: 'Use delete action to archive' }, 400, origin);
                 const { row, ...original } = old;

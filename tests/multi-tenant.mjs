@@ -56,7 +56,11 @@ try {
  assert.equal((await call('/records/Clients','GET',alice)).data.records.length,1);
  assert.equal((await call('/records/Clients','GET',bob)).data.records.length,0);
  assert.equal((await call('/products','GET',alice)).status,404);
- assert.equal((await call('/records/Invoices','POST',alice,{name:'Test'})).status,503);
+ assert.equal((await call('/records/Invoices','POST',alice,{name:'Test'})).status,403);
+ const draft=await call('/records/Invoices','POST',alice,{name:'Customer One',client_id:add.data.record.id,status:'Draft',seller_name:'Alpha Trading',items:[{description:'Software service',quantity:1,unit_price:100}],adjustments:[]});
+ assert.equal(draft.status,201,JSON.stringify(draft.data));
+ assert.equal(draft.data.record.status,'Draft');
+ assert.equal((await call('/records/Invoices/'+draft.data.record.id,'PATCH',alice,{status:'Active'})).status,403);
  master[1][7]='Suspended';
  assert.equal((await call('/records/Clients','GET',alice)).status,401);
  assert.equal((await call('/records/Clients','GET',bob)).status,200);
