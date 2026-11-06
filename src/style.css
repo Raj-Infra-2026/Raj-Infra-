@@ -437,3 +437,65 @@
 .app-shell.role-admin[data-theme=light]{--accent:#a97838;--accent2:#b99158;--button-text:#fff;--soft:#f4eadc;--hero-bg:#f9f0e5;--hero-border:#e9d8bc;--flame-low:#c38a4d;--flame-high:#e9c58b}
 @media(max-width:920px){.alif-nav-links{display:none}.alif-hero{grid-template-columns:1fr;gap:12px;padding-top:65px}.alif-signature-art{height:315px}.alif-art-letter{font-size:215px}.alif-feature-band{grid-template-columns:1fr}.alif-access-area{grid-template-columns:1fr;gap:30px;max-width:650px}.alif-access-intro h1{font-size:44px}}
 @media(max-width:600px){.alif-public-nav{min-height:75px;gap:8px;padding:12px 16px}.alif-wordmark{font-size:13px;letter-spacing:.12em;gap:9px}.alif-wordmark .alif-monogram{width:36px;height:36px}.alif-nav-buttons{gap:7px}.alif-nav-buttons .alif-outline,.alif-nav-buttons .alif-gold{font-size:11px;min-height:36px;padding:0 10px}.alif-hero{padding:54px 20px 35px;min-height:auto}.alif-hero h1{font-size:42px}.alif-hero-actions{margin:24px 0}.alif-gold.large,.alif-outline.large{width:100%}.alif-signature-art{height:280px}.alif-art-caption{font-size:14px}.alif-feature-band{margin-bottom:30px}.alif-access-area{padding:35px 15px;gap:32px}.alif-access-card{padding:24px 18px}.alif-form-two{grid-template-columns:1fr}.alif-public-footer{gap:15px;padding:20px 14px;flex-wrap:wrap}}
+
+/* ALIF LABS — cinematic public experience. Scoped to public portal only. */
+.cinematic-public{--cin-bg:#070a12;--cin-ink:#f3f6fd;--cin-muted:#a9b4c8;--cin-accent:#bcd5f8;--cin-panel:rgba(17,24,40,.74);--cin-border:rgba(189,210,243,.20);--cin-button:#dce9fa;background:var(--cin-bg);color:var(--cin-ink);isolation:isolate;transition:background .35s,color .35s}
+.cinematic-public[data-public-theme="light"]{--cin-bg:#f1f5fa;--cin-ink:#152238;--cin-muted:#4b5b71;--cin-accent:#345e96;--cin-panel:rgba(255,255,255,.80);--cin-border:rgba(44,74,119,.19);--cin-button:#1e385b}
+.cinematic-public::before{background:radial-gradient(circle at 80% 18%,rgba(78,123,190,.22),transparent 58%)}
+.cinematic-atmosphere{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:0}
+.cinematic-atmosphere span{position:absolute;border-radius:50%;filter:blur(45px);opacity:.3;animation:cinematicDrift 16s ease-in-out infinite alternate}
+.cinematic-atmosphere span:nth-child(1){width:480px;height:480px;top:7%;right:-180px;background:#3c6097}
+.cinematic-atmosphere span:nth-child(2){width:360px;height:360px;top:35%;left:-200px;background:#426c9c;animation-delay:-6s}
+.cinematic-atmosphere span:nth-child(3){width:280px;height:280px;bottom:5%;right:15%;background:#677c9e;animation-delay:-11s}
+.cinematic-public .alif-public-nav{border-bottom-color:var(--cin-border)}
+.cinematic-public .alif-wordmark,.cinematic-public .alif-nav-links a{color:var(--cin-ink)}
+.cinematic-public .alif-wordmark strong span{color:var(--cin-accent)}
+.cinematic-public .alif-monogram{background:linear-gradient(140deg,#edf6ff,#7792b8);box-shadow:0 12px 35px #5a8cce30}
+.cinematic-public .alif-monogram span{color:#142237}
+.cinematic-public .alif-monogram i{background:#142237}
+.cinematic-public .alif-gold{background:var(--cin-button);color:var(--cin-bg);box-shadow:0 12px 30px rgba(69,113,173,.19)}
+.cinematic-public[data-public-theme="light"] .alif-gold{color:white}
+.cinematic-public .alif-outline{color:var(--cin-ink);border-color:var(--cin-border);background:rgba(132,157,195,.08)}
+.cinematic-public .alif-theme-toggle{display:inline-flex;align-items:center;gap:7px;min-height:42px;padding:0 12px;border:1px solid var(--cin-border);border-radius:11px;background:rgba(140,165,205,.09);color:var(--cin-ink);font-size:12px;font-weight:750;cursor:pointer}
+.cinematic-public .alif-theme-toggle:hover{background:rgba(140,165,205,.18)}
+.cinematic-public .alif-kicker,.cinematic-public .alif-form-eyebrow{color:var(--cin-accent)}
+.cinematic-public .alif-hero-copy,.cinematic-public .alif-access-intro{animation:cinematicReveal .85s ease-out both}
+.cinematic-public .alif-hero h1 em{color:var(--cin-accent)}
+.cinematic-public .alif-hero p,.cinematic-public .alif-access-intro p,.cinematic-public .alif-feature-card p,.cinematic-public .alif-switch,.cinematic-public .alif-success p{color:var(--cin-muted)}
+.cinematic-public .alif-hero-foot{color:var(--cin-muted)}
+.cinematic-public .alif-hero-foot svg,.cinematic-public .alif-feature-card svg{color:var(--cin-accent)}
+.cinematic-public .alif-feature-card{background:var(--cin-panel);border-color:var(--cin-border);backdrop-filter:blur(14px);transition:transform .25s,border-color .25s}
+.cinematic-public .alif-feature-card:hover{transform:translateY(-5px);border-color:var(--cin-accent)}
+.cinematic-public .alif-bottom-statement{background:rgba(117,143,185,.08)}
+.cinematic-public .alif-bottom-statement>span{color:var(--cin-accent)}
+.cinematic-public .alif-public-footer{border-top-color:var(--cin-border);color:var(--cin-muted)}
+.cinematic-signature{perspective:900px;transform-style:preserve-3d}
+.cinematic-signature::before{background:rgba(93,143,220,.18);filter:blur(80px)}
+.cinematic-signature .alif-orbit{border-color:rgba(155,193,243,.22);animation:cinematicOrbit 24s linear infinite}
+.cinematic-signature .orbit-two{animation-direction:reverse;animation-duration:30s}
+.cinematic-symbol{width:min(100%,450px);height:430px;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 18px 40px rgba(89,149,228,.26));transform:rotateY(calc(var(--pointer-x,0)*10deg)) rotateX(calc(var(--pointer-y,0)*-8deg));transition:transform .25s ease-out;animation:cinematicFloat 6s ease-in-out infinite}
+.cinematic-symbol-svg{height:100%;width:100%;max-width:400px;overflow:visible;animation:cinematicShimmer 9s ease-in-out infinite}
+.cinematic-draw{stroke-dasharray:950;stroke-dashoffset:950;animation:cinematicDraw 2.7s .25s ease forwards}
+.cinematic-starlight{position:absolute;inset:0;opacity:.65;background-image:radial-gradient(circle,#c7e2ff 1px,transparent 1.6px),radial-gradient(circle,#86b9ef 1px,transparent 1.6px);background-size:80px 97px,137px 121px;background-position:12px 27px,30px 55px;mask-image:radial-gradient(ellipse at center,#000,transparent 73%);animation:cinematicStars 18s linear infinite}
+.cinematic-public .alif-art-caption{color:var(--cin-ink);bottom:0}.cinematic-public .alif-art-caption span{color:var(--cin-accent)}.cinematic-public .alif-art-caption small{color:var(--cin-muted)}
+.cinematic-public .alif-access-card{background:var(--cin-panel);border-color:var(--cin-border);backdrop-filter:blur(25px);-webkit-backdrop-filter:blur(25px);box-shadow:0 30px 90px rgba(0,0,0,.24);animation:cinematicReveal .85s .12s ease-out both}
+.cinematic-public .alif-access-card label{color:var(--cin-ink)}
+.cinematic-public .alif-access-card input{color:var(--cin-ink);background:rgba(123,153,194,.08);border-color:var(--cin-border);color-scheme:dark}
+.cinematic-public[data-public-theme="light"] .alif-access-card input{color-scheme:light}
+.cinematic-public .alif-access-card input:focus{border-color:var(--cin-accent);box-shadow:0 0 0 3px rgba(117,165,225,.18)}
+.cinematic-public .alif-access-card input::placeholder{color:var(--cin-muted)}
+.cinematic-public .alif-switch button{color:var(--cin-accent)}
+.cinematic-public .alif-success svg{color:var(--cin-accent)}
+.cinematic-access-emblem{position:relative;width:92px;height:92px;display:grid;place-items:center;margin-bottom:22px}
+.cinematic-access-emblem .alif-monogram{margin:0;position:relative;z-index:1;animation:cinematicFloat 6s ease-in-out infinite}
+.cinematic-emblem-ring{position:absolute;inset:0;border:1px solid var(--cin-border);border-radius:50%;animation:cinematicOrbit 15s linear infinite}
+.cinematic-emblem-ring::after{content:'';position:absolute;left:50%;top:-4px;width:8px;height:8px;border-radius:50%;background:var(--cin-accent);box-shadow:0 0 14px var(--cin-accent)}
+@keyframes cinematicDrift{to{transform:translate(55px,-65px) scale(1.2)}}
+@keyframes cinematicReveal{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:translateY(0)}}
+@keyframes cinematicFloat{0%,100%{translate:0 0}50%{translate:0 -15px}}
+@keyframes cinematicOrbit{to{rotate:360deg}}
+@keyframes cinematicShimmer{0%,100%{filter:brightness(1)}50%{filter:brightness(1.23)}}
+@keyframes cinematicDraw{to{stroke-dashoffset:0}}
+@keyframes cinematicStars{to{background-position:92px 124px,167px 176px}}
+@media(max-width:600px){.cinematic-public .alif-theme-toggle{padding:0 9px;min-height:36px}.cinematic-public .alif-theme-toggle span{display:none}.cinematic-symbol{height:260px}.cinematic-public .alif-nav-buttons{gap:5px}.cinematic-public .alif-signature-art{height:320px}}
+@media(prefers-reduced-motion:reduce){.cinematic-public *, .cinematic-public *::before,.cinematic-public *::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}.cinematic-draw{stroke-dashoffset:0}}
