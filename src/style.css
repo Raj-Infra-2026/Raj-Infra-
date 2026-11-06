@@ -500,123 +500,44 @@
 @media(max-width:600px){.cinematic-public .alif-theme-toggle{padding:0 9px;min-height:36px}.cinematic-public .alif-theme-toggle span{display:none}.cinematic-symbol{height:260px}.cinematic-public .alif-nav-buttons{gap:5px}.cinematic-public .alif-signature-art{height:320px}}
 @media(prefers-reduced-motion:reduce){.cinematic-public *, .cinematic-public *::before,.cinematic-public *::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}.cinematic-draw{stroke-dashoffset:0}}
 
+/* Option 4 — Liquid Metal Flow, responsive CSS/SVG animation with no external rendering dependency */
+.liquid-stage{overflow:hidden;min-height:475px}
+.liquid-aura{position:absolute;width:80%;height:80%;left:10%;top:8%;background:radial-gradient(ellipse,rgba(57,146,248,.25),transparent 65%);filter:blur(28px);animation:liquidAura 8s ease-in-out infinite alternate}
+.liquid-sculpture{position:relative;z-index:2;width:min(100%,560px);height:445px;transform:rotateY(calc(var(--pointer-x,0)*9deg)) rotateX(calc(var(--pointer-y,0)*-7deg));transition:transform .3s ease;animation:liquidHover 6s ease-in-out infinite;filter:drop-shadow(0 16px 24px rgba(80,159,245,.3))}
+.liquid-svg{width:100%;height:100%;overflow:visible}
+.liquid-ribbon{transform-origin:50% 55%;animation:liquidBreathe 8s ease-in-out infinite alternate}
+.ribbon-two{animation-delay:-2.3s;animation-duration:7s}.ribbon-three{animation-delay:-4s;animation-duration:9s}
+.liquid-glint{stroke-dasharray:190 620;stroke-dashoffset:810;animation:liquidGlint 5.5s linear infinite}.glint-two{animation-delay:-2.8s}
+.liquid-drop{transform-box:fill-box;transform-origin:center;animation:liquidDroplet 5s ease-in-out infinite}.drop-two{animation-delay:-2s}.drop-three{animation-delay:-3.5s}
+.liquid-halo{position:absolute;border:1px solid rgba(149,201,255,.37);width:68%;height:26%;left:16%;top:53%;border-radius:50%;transform:rotate(-16deg);box-shadow:0 0 25px rgba(63,153,243,.14);animation:liquidRing 12s ease-in-out infinite alternate}
+.halo-back{z-index:1;opacity:.5}.halo-front{z-index:3;pointer-events:none;clip-path:inset(58% 0 0 0);opacity:.7}
+.liquid-pedestal{position:absolute;bottom:60px;left:23%;width:54%;height:42px;border:2px solid rgba(131,196,255,.35);border-radius:50%;box-shadow:0 0 34px rgba(76,158,246,.2),inset 0 0 28px rgba(76,158,246,.12)}
+.liquid-stage .alif-art-caption{z-index:4;bottom:0}
+.cinematic-public[data-public-theme="light"] .liquid-aura{background:radial-gradient(ellipse,rgba(62,132,210,.19),transparent 68%)}
 .nav-group-trigger{width:100%;text-align:left}.nav-group-trigger .group-chevron{margin-left:auto;transition:transform .2s}.group-chevron.open{transform:rotate(90deg)}
 .nav-submenu{padding-left:14px;border-left:1px solid var(--border,rgba(150,165,188,.22));margin-left:17px}.nav-submenu .nav-link{font-size:13px}
 .side-profile .brand-text{min-width:0}.side-profile .brand-text b,.side-profile .brand-text small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:185px}
 .topbar-identity{display:flex;flex-direction:column;text-align:right;max-width:220px;min-width:0}.topbar-identity strong,.topbar-identity small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.topbar-identity strong{font-size:12px}.topbar-identity small{font-size:10px;opacity:.7}
 .brand-logo .brand-text strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;display:block}
-@media(max-width:600px){.topbar-identity{display:none}.nav-submenu{margin-left:9px}}
+@keyframes liquidAura{to{transform:scale(1.16);opacity:.58}}
+@keyframes liquidHover{50%{translate:0 -16px}}
+@keyframes liquidBreathe{to{transform:scale(1.035) rotate(1.4deg)}}
+@keyframes liquidGlint{to{stroke-dashoffset:-810}}
+@keyframes liquidDroplet{50%{transform:translateY(-23px) scale(.8);opacity:.55}}
+@keyframes liquidRing{to{transform:rotate(14deg) scale(1.09)}}
+@media(max-width:600px){.liquid-stage{min-height:310px}.liquid-sculpture{height:285px}.liquid-pedestal{bottom:45px}.topbar-identity{display:none}.nav-submenu{margin-left:9px}}
+@media(prefers-reduced-motion:reduce){.liquid-stage *,.liquid-stage *::before,.liquid-stage *::after{animation:none!important;transition:none!important}.liquid-glint{stroke-dasharray:none;stroke-dashoffset:0}}
 
-
-/* ALIF LABS / DIGITAL CROWN CITY — cinematic image-and-film centerpiece. */
-.cinematic-public{
-  --crown-gold:#f2c577;
-  --crown-gold-soft:rgba(245,194,113,.48);
-  --crown-bg:#070a10;
-  --crown-edge:rgba(240,190,103,.26);
-  --cin-accent:#eec689;
-  --cin-button:linear-gradient(115deg,#fff0d4,#e4b971 56%,#c98b43);
-  --cin-panel:rgba(13,20,31,.82);
-  --cin-border:rgba(230,194,143,.22);
-  background:radial-gradient(ellipse at 75% 19%,#22201e 0%,transparent 54%),#080b10;
-}
-.cinematic-public .alif-gold{background:var(--cin-button);color:#1c1a19}
-.cinematic-public .alif-wordmark strong span{color:#ebc48d}
-.cinematic-public .alif-kicker,.cinematic-public .alif-form-eyebrow{color:#e8bd83}
-.cinematic-public .alif-hero h1 em{color:#f1c68d}
-.cinematic-public .alif-hero-foot svg,.cinematic-public .alif-feature-card svg{color:#e0ad6a}
-.cinematic-public .alif-monogram{background:linear-gradient(145deg,#fff2d9,#c99450);box-shadow:0 12px 35px #d5a16636}
-.cinematic-public .alif-access-card{box-shadow:0 25px 95px #030508a8,0 0 85px #d9a25312}
-.cinematic-public .alif-theme-toggle{border-color:var(--cin-border)}
-.cinematic-public .alif-bottom-statement{background:linear-gradient(160deg,#10131b,#151a22)}
-.cinematic-public .alif-bottom-statement>span{color:#e6b476}
-.cinematic-public .alif-switch button{color:#f2c68d}
-.cinematic-public[data-public-theme="light"]{
-  --crown-gold:#b47c36;
-  --crown-edge:rgba(157,104,49,.28);
-  --cin-bg:#faf8f5;
-  --cin-ink:#1c2736;
-  --cin-muted:#5b6473;
-  --cin-panel:rgba(255,255,255,.89);
-  --cin-border:rgba(158,117,69,.28);
-  --cin-accent:#936026;
-  background:radial-gradient(ellipse at 83% 15%,#f4e3cb 0%,transparent 52%),#f9f7f3;
-}
-.cinematic-public[data-public-theme="light"] .alif-hero h1 em{color:#97632b}
-.cinematic-public[data-public-theme="light"] .alif-kicker,.cinematic-public[data-public-theme="light"] .alif-form-eyebrow,.cinematic-public[data-public-theme="light"] .alif-switch button{color:#98652b}
-.cinematic-public[data-public-theme="light"] .alif-gold{background:linear-gradient(115deg,#bb8a4a,#815626);color:#fff}
-.cinematic-public[data-public-theme="light"] .alif-bottom-statement{background:linear-gradient(160deg,#f4ede2,#e9ecef)}
-.cinematic-public[data-public-theme="light"] .alif-bottom-statement>span{color:#98632b}
-.cinematic-public[data-public-theme="light"] .alif-feature-card{box-shadow:0 9px 32px rgba(62,45,24,.06)}
-.cinematic-public[data-public-theme="light"] .alif-access-card{box-shadow:0 25px 75px #39475a22}
-.cinematic-public[data-public-theme="light"] .alif-wordmark strong span{color:#a46c2e}
-.cinematic-public[data-public-theme="light"] .alif-monogram{background:linear-gradient(130deg,#f8d89f,#b47d3d)}
-
-/* A single rendered city scene is reused on home, login, and registration. */
-.crown-city-stage{overflow:visible;min-height:510px;height:510px;isolation:isolate}
-.crown-city-stage::before{display:none}
-.crown-city-scene{
-  --crown-tilt-x:0deg;--crown-tilt-y:0deg;--crown-shift-x:0px;--crown-shift-y:0px;
-  position:relative;isolation:isolate;width:100%;height:100%;min-height:300px;
-  overflow:hidden;border-radius:25px;perspective:1100px;
-  background:radial-gradient(circle at 50% 53%,#2b231e,#06090d 70%);
-  border:1px solid rgba(223,169,90,.25);
-  box-shadow:0 30px 90px rgba(0,0,0,.40),inset 0 0 0 1px #ffe5ac10;
-  transform:translateZ(0);
-}
-.crown-city-frame{position:absolute;inset:-5%;transform:rotateX(var(--crown-tilt-x)) rotateY(var(--crown-tilt-y)) translate(var(--crown-shift-x),var(--crown-shift-y));transition:transform .42s cubic-bezier(.22,1,.36,1);will-change:transform}
-.crown-city-poster,.crown-city-film{display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 50%}
-.crown-city-film{opacity:1;filter:saturate(1.12) contrast(1.04)}
-.crown-city-vignette{pointer-events:none;position:absolute;inset:-1px;z-index:1;background:linear-gradient(180deg,rgba(3,5,12,.10) 6%,transparent 28%,transparent 63%,rgba(4,7,15,.68) 96%),linear-gradient(90deg,rgba(5,8,12,.38),transparent 23%,transparent 80%,rgba(5,8,12,.32));}
-.crown-city-beam{pointer-events:none;position:absolute;inset:-35%;z-index:2;opacity:.4;mix-blend-mode:screen;background:linear-gradient(116deg,transparent 35%,rgba(255,195,105,0) 42%,rgba(255,211,151,.17) 47%,rgba(255,231,177,.35) 49%,rgba(255,211,151,.10) 52%,transparent 59%);transform:translateX(-65%) rotate(-8deg);animation:crownSweep 13s ease-in-out infinite}
-.crown-city-orbit{pointer-events:none;position:absolute;z-index:2;border:1px solid rgba(255,207,135,.29);border-radius:50%;left:8%;width:84%;top:25%;height:39%;transform:rotate(-16deg) rotateX(64deg);box-shadow:0 0 22px rgba(251,177,64,.16),inset 0 0 14px rgba(244,184,96,.12)}
-.crown-city-orbit--near{animation:crownOrbit 17s ease-in-out infinite alternate}
-.crown-city-orbit--far{left:16%;width:68%;top:8%;height:51%;opacity:.42;transform:rotate(15deg) rotateX(72deg);animation:crownOrbitReverse 22s ease-in-out infinite alternate}
-.crown-city-light{position:absolute;z-index:3;pointer-events:none;width:3px;height:3px;border-radius:50%;background:#fff6ce;box-shadow:0 0 8px 3px #ffd88b,0 0 28px 9px #e6a548aa;offset-path:ellipse(44% 17% at 50% 46%);offset-rotate:0deg;animation:crownSatellite 13s linear infinite}
-.crown-city-light--two{offset-path:ellipse(34% 26% at 51% 38%);animation-duration:19s;animation-delay:-6s;opacity:.7}
-.crown-city-edge{pointer-events:none;position:absolute;z-index:4;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 1px rgba(244,207,150,.15),inset 0 25px 55px rgba(255,218,159,.025)}
-.crown-city-brand{z-index:4;position:absolute;left:8%;right:8%;bottom:6%;display:flex;align-items:center;flex-wrap:wrap;gap:9px 14px;color:#fff8e9;text-shadow:0 2px 18px #080a0b}
-.crown-city-brand-rule{height:1px;width:27px;background:#e5c186}
-.crown-city-brand strong{font-size:13px;letter-spacing:.34em;font-weight:800}
-.crown-city-brand small{font-size:9px;letter-spacing:.17em;color:#f1dabb}
-.cinematic-public[data-public-theme="light"] .crown-city-scene{border-color:rgba(132,89,39,.28);box-shadow:0 25px 65px rgba(78,60,39,.17),inset 0 0 0 1px #fffaed}
-
-/* Live cinematic city on authentication screens as well (the earlier design only had an icon). */
-.alif-access-area{max-width:1360px;grid-template-columns:minmax(0,1fr) minmax(340px,448px);gap:clamp(22px,4vw,62px)}
-.alif-access-intro{min-width:0;position:relative}
-.alif-access-intro .cinematic-access-emblem{margin-bottom:8px;transform:scale(.8);transform-origin:left top;height:75px}
-.alif-access-intro h1{margin:12px 0 10px;font-size:clamp(32px,3.7vw,56px)}
-.alif-access-intro p{font-size:14px;line-height:1.7;max-width:580px}
-.crown-city-scene--compact{margin-top:23px;height:clamp(275px,28vw,380px);min-height:0;border-radius:20px}
-.crown-city-scene--compact .crown-city-vignette{background:linear-gradient(180deg,transparent 52%,rgba(4,7,15,.18) 90%)}
-.cinematic-public .alif-access-intro .alif-kicker{letter-spacing:.16em}
-@media(max-width:1100px){
-  .crown-city-stage{height:440px;min-height:440px}
-  .alif-access-area{gap:25px}
-  .crown-city-brand small{width:100%;margin-left:40px}
-}
-@media(max-width:920px){
-  .crown-city-stage{height:400px;min-height:400px}
-  .alif-access-area{grid-template-columns:1fr;max-width:660px;padding-top:35px}
-  .crown-city-scene--compact{height:305px}
-}
-@media(max-width:600px){
-  .crown-city-stage{height:300px;min-height:300px}
-  .crown-city-scene{border-radius:16px}
-  .crown-city-scene--compact{height:220px;margin-top:17px}
-  .crown-city-brand{left:6%;bottom:5%}
-  .crown-city-brand strong{font-size:11px;letter-spacing:.23em}
-  .crown-city-brand small{font-size:7px;letter-spacing:.08em;margin-left:0}
-  .crown-city-light{display:none}
-  .alif-access-intro .cinematic-access-emblem{display:none}
-  .alif-access-area{padding-top:30px}
-}
-@media(prefers-reduced-motion:reduce){
-  .crown-city-scene *, .crown-city-scene *::before,.crown-city-scene *::after{animation:none!important;transition:none!important}
-  .crown-city-film{display:none}
-  .crown-city-frame{will-change:auto}
-}
-@keyframes crownSweep{0%,15%{transform:translateX(-70%) rotate(-8deg);opacity:0}33%{opacity:.50}65%{transform:translateX(62%) rotate(-8deg);opacity:.26}100%{transform:translateX(70%) rotate(-8deg);opacity:0}}
-@keyframes crownOrbit{0%{transform:rotate(-19deg) rotateX(66deg) scale(.93);opacity:.24}100%{transform:rotate(8deg) rotateX(62deg) scale(1.04);opacity:.54}}
-@keyframes crownOrbitReverse{to{transform:rotate(-17deg) rotateX(70deg) scale(.94);opacity:.18}}
-@keyframes crownSatellite{to{offset-distance:100%}}
+/* Option 5 — DIGITAL CITY: animated projected glass architecture, not typography or dot art. */
+.city-stage{overflow:hidden;min-height:475px;isolation:isolate}
+.digital-city-scene{position:absolute;inset:0;overflow:hidden;z-index:1;background:radial-gradient(ellipse at 52% 48%,rgba(16,66,123,.38),transparent 65%)}
+.digital-city-canvas{display:block;width:100%;height:100%;filter:drop-shadow(0 0 16px rgba(45,143,245,.23))}
+.digital-city-haze{position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,transparent 40%,rgba(15,62,118,.12) 70%,transparent 95%);animation:cityHaze 9s ease-in-out infinite alternate}
+.digital-city-reflection{position:absolute;bottom:0;left:12%;right:12%;height:20%;background:radial-gradient(ellipse,rgba(47,139,231,.18),transparent 70%);filter:blur(14px)}
+.city-caption{z-index:3!important;bottom:4px!important;text-shadow:0 2px 18px #020a16}
+.cinematic-public[data-public-theme="light"] .digital-city-scene{background:radial-gradient(ellipse at 52% 48%,rgba(64,142,229,.18),transparent 68%)}
+.cinematic-public[data-public-theme="light"] .digital-city-canvas{filter:drop-shadow(0 8px 18px rgba(44,106,182,.14))}
+.cinematic-public[data-public-theme="light"] .city-caption{text-shadow:0 2px 18px #fff}
+@keyframes cityHaze{to{opacity:.5;transform:translateY(-15px)}}
+@media(max-width:600px){.city-stage{min-height:320px}.digital-city-scene{inset:0 -12%}}
+@media(prefers-reduced-motion:reduce){.digital-city-haze{animation:none}}
