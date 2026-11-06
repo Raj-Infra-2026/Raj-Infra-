@@ -1,5 +1,3 @@
-import { buildUnsignedInvoiceDraft } from './zatca/xml-draft.mjs';
-import { inspectDraftInvoice } from './zatca/draft-validation.mjs';
 /* ALIF LABS multi-company API. Credentials are server-side only.
    Public registration uses a master spreadsheet; each authenticated tenant gets its own sheet. */
 const TABLES = ['Clients', 'Quotations', 'Invoices', 'DeliveryNotes', 'ClientPOs', 'Vendors', 'PurchaseOrders'];
@@ -39,7 +37,7 @@ function safeEqual(a, b) { if (typeof a !== 'string' || typeof b !== 'string')
 async function passwordOK(u, password) { if (typeof password !== 'string' || password.length > 256)
     return false; if (u.password_hash && u.password_salt) {
     const raw = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
-    const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: enc.encode(u.password_salt), iterations: 100000 }, raw, 256);
+    const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: enc.encode(u.password_salt), iterations: 210000 }, raw, 256);
     return safeEqual(b64(bits), u.password_hash);
 } return !!u.password && safeEqual(u.password, password); }
 async function googleToken(env) { if (tokenCache.value && Date.now() < tokenCache.expires)
@@ -372,7 +370,7 @@ async function registerCompany(env, body) {
     if (existing.some(r => r.email === email)) return { status: 409, error: 'This email is already registered.' };
     const salt = b64(crypto.getRandomValues(new Uint8Array(24)));
     const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
-    const derived = await crypto.subtle.deriveBits({ name:'PBKDF2', hash:'SHA-256', salt:enc.encode(salt), iterations:100000 }, keyMaterial, 256);
+    const derived = await crypto.subtle.deriveBits({ name:'PBKDF2', hash:'SHA-256', salt:enc.encode(salt), iterations:210000 }, keyMaterial, 256);
     const tenant_id = crypto.randomUUID();
     const now = new Date().toISOString();
     const master = registryEnvironment(env);
@@ -428,39 +426,6 @@ export default { async fetch(req, env) {
             env = session.tenantEnv;
             if (url.pathname === '/api/me')
                 return reply({ user: { username: user.username, role:'admin', company_name:tenant.company_name } }, 200, origin);
-            // Authenticated, tenant-scoped engineering preview. This never issues, signs,
-            // reports, clears, or changes an invoice. Not a production ZATCA document.
-            if (url.pathname.startsWith('/api/zatca/draft-xml/')) {
-                if (req.method !== 'GET') return reply({ error: 'Method not allowed' }, 405, origin);
-                const invoiceId = decodeURIComponent(url.pathname.slice('/api/zatca/draft-xml/'.length));
-                if (!invoiceId || invoiceId.length > 128 || invoiceId.includes('/'))
-                    return reply({ error: 'Invalid invoice ID' }, 400, origin);
-                const invoice = (await records(env, 'Invoices')).find(r => r.id === invoiceId && visible(user, r));
-                if (!invoice) return reply({ error: 'Invoice not found' }, 404, origin);
-                if (invoice.status !== 'Draft') return reply({ error: 'Only draft invoices can be previewed as unsigned XML' }, 409, origin);
-                const seller = { name: invoice.seller_name, vat: invoice.seller_vat };
-                const buyer = { name: invoice.buyer_name || invoice.name || 'Customer' };
-                const kind = url.searchParams.get('kind') || 'standard';
-                const data = {
-                    kind, id: invoice.reference, uuid: invoice.id,
-                    issueDate: String(invoice.date || '').slice(0, 10), seller, buyer,
-                    items: (invoice.items || []).map(x => ({ description: x.description, quantity: x.quantity, unitPrice: x.unit_price }))
-                };
-                // This starter generator supports only simple 15% VAT lines. Reject
-                // adjustments rather than silently generate incorrect totals.
-                if ((invoice.adjustments || []).length || Number(invoice.discount || 0))
-                    return reply({ error: 'XML draft preview does not support invoice adjustments or discounts yet' }, 422, origin);
-                if (Number(invoice.tax_rate) !== 15 || !Array.isArray(invoice.items) || !invoice.items.length)
-                    return reply({ error: 'XML preview requires a 15% VAT invoice with line items' }, 422, origin);
-                const expected = Math.round(invoice.items.reduce((sum, x) => sum + Number(x.quantity) * Number(x.unit_price), 0) * 115) / 100;
-                if (Math.abs(expected - Number(invoice.amount)) > 0.011)
-                    return reply({ error: 'Invoice totals differ from the XML preview calculation' }, 422, origin);
-                const preflight = inspectDraftInvoice(data);
-                if (!preflight.readyForDraft) return reply({ error: 'Invoice XML draft preflight failed', preflight }, 422, origin);
-                const generated = buildUnsignedInvoiceDraft(data);
-                return reply({ status: 'UNSIGNED_DEVELOPMENT_DRAFT', invoice_id: invoice.id,
-                    xml: generated, preflight, warning: 'Not ZATCA validated, signed, cleared or reported. Not for official issuance.' }, 200, origin);
-            }
             if (url.pathname === '/api/company-settings') {
                 if (req.method === 'GET')
                     return reply({ company: await getCompanySettings(env) }, 200, origin);
@@ -521,10 +486,9 @@ export default { async fetch(req, env) {
                 return reply({ records: data.filter(r => visible(user, r) && (!q || JSON.stringify(r).toLowerCase().includes(q))).slice(0, 1000).map(({ row, brand_id, ...r }) => r) }, 200, origin);
             }
             if (req.method === 'POST' && !id) {
+                if (table === 'Invoices' && env.ALLOW_TAX_INVOICE_ISSUANCE !== 'true')
+                    return reply({ error: 'Tax invoice issuance is unavailable until compliance onboarding is complete.' }, 503, origin);
                 const b = await req.json();
-                // Stage 1.3 has no compliant issuance workflow: permit draft creation only.
-                if (table === 'Invoices' && b.status !== 'Draft')
-                    return reply({ error: 'Only Draft invoices can be saved until ZATCA onboarding and issuance integration are complete.' }, 403, origin);
                 if (table === 'Clients')
                     validateClient(b);
                 const rec = cleanSpecial(table, b, clean(b, user, null));
@@ -563,8 +527,6 @@ export default { async fetch(req, env) {
                     return reply({ error: 'Client name modification not allowed' }, 403, origin);
                 if (user.role !== 'admin' && DOCS.includes(table) && (('client_id' in b && b.client_id !== old.client_id) || ('name' in b && b.name !== old.name)))
                     return reply({ error: 'Only admin can change the document client/name' }, 403, origin);
-                if (table === 'Invoices' && req.method === 'PATCH' && b.status !== undefined && b.status !== 'Draft')
-                    return reply({ error: 'Drafts cannot be issued or moved to another status until ZATCA onboarding is complete.' }, 403, origin);
                 if (req.method === 'PATCH' && b.status === 'Deleted')
                     return reply({ error: 'Use delete action to archive' }, 400, origin);
                 const { row, ...original } = old;
