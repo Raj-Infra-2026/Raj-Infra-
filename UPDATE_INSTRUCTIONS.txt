@@ -1,0 +1,27 @@
+RAJ INFRA — TARGETED UPDATE
+===========================
+
+Update only these files in your EXISTING GitHub repository:
+
+1. src/main.jsx             — workspace defaults, quotation client creation, action KPIs, official branding
+2. src/BusinessModules.jsx  — product SKU optional, invoice line spacing, charges and deductions, A4 print totals
+3. src/style.css            — input spacing and dropdown readability
+4. worker/index.js          — Active default, optional SKU validation, AuditLogs tab auto-creation, adjustment validation
+
+IMPORTANT:
+- Do not replace your whole repository. Extract the ZIP and copy each file to the matching path.
+- Existing Cloudflare USERS_JSON and login logic are preserved.
+- No spreadsheet data is deleted or overwritten. Missing AuditLogs tab is created automatically when possible.
+- AuditLogs requires the service account to have spreadsheet edit permission.
+- Charges/deductions are applied AFTER the 15% VAT calculation in this build; have your accountant verify tax treatment before using live invoices.
+- QR is a basic Saudi VAT TLV QR and is NOT a claim of ZATCA Phase 2 certification.
+- Browser A4 print uses Print / Save as PDF. It is not a server-generated signed PDF.
+
+TESTING
+- Worker JavaScript syntax check: passed.
+- TypeScript JSX parser syntax checks: passed.
+- Existing npm test suites: passed.
+- Full Vite frontend build: NOT VERIFIED (dependencies unavailable here).
+- Live Cloudflare / Google Sheets integration: NOT VERIFIED.
+
+Please test in a staging deployment and keep a backup of your current source.

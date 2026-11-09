@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import { inspectDraftInvoice } from '../worker/zatca/draft-validation.mjs';
+const valid = {kind:'standard',id:'DRAFT-1',uuid:'123e4567-e89b-42d3-a456-426614174000',issueDate:'2026-11-05',issueTime:'14:20:00',icv:1,pih:'NWZlY2ViNjZmZmM4NmYzOGQ5NTI3ODZjNmQ2OTZjNzljMmRiYzIzOWRkNGU5MWI0NjcyOWQ3M2EyN2ZiNTdlOQ==',seller:{name:'Example Seller',vat:'300000000000003',address:{street:'Test Road',building:'1234',district:'Center',city:'Jeddah',postalCode:'23456'}},buyer:{name:'Example Buyer'},items:[{description:'Service',quantity:2,unitPrice:100}]};
+const result=inspectDraftInvoice(valid);
+assert.equal(result.readyForDraft,true);
+assert.equal(result.validationLevel,'LOCAL_PREFLIGHT_ONLY');
+assert.ok(result.warnings.length>0);
+assert.equal(inspectDraftInvoice({...valid,seller:{...valid.seller,vat:'invalid'}}).readyForDraft,false);
+assert.equal(inspectDraftInvoice({...valid,items:[{description:'',quantity:0,unitPrice:-1}]}).readyForDraft,false);
+assert.equal(inspectDraftInvoice({...valid,kind:'standard',buyer:{}}).readyForDraft,false);
+console.log('ZATCA draft preflight tests passed');
