@@ -7,19 +7,17 @@ function uid() {
   throw Error('A secure browser context is required for generating a draft UUID.');
 }
 
-export function createDraftInvoiceXml(doc, kind = 'standard') {
-  if (!['standard', 'simplified'].includes(kind)) throw Error('Invoice type must be standard or simplified.');
+export function createDraftInvoiceXml(doc) {
   if (!doc || !/^\d{4}-\d{2}-\d{2}$/.test(clean(doc.date))) throw Error('Choose a valid invoice date.');
   if (!/^3\d{13}3$/.test(clean(doc.seller_vat))) throw Error('A valid 15-digit Saudi seller VAT number is required (starts and ends with 3).');
   if (!clean(doc.seller_name)) throw Error('Enter the registered seller company name.');
   if ((doc.adjustments || []).some(a => Number(a.amount))) throw Error('Draft XML currently supports invoices without extra charges or deductions; remove adjustments before exporting XML.');
-  if (kind === 'standard' && clean(doc.buyer_vat) && !/^3\d{13}3$/.test(clean(doc.buyer_vat))) throw Error('Buyer VAT must be 15 digits starting and ending with 3.');
   const items = (doc.items || []).map(x => ({
     description: clean(x.description), quantity: Number(x.quantity), unitPrice: Number(x.unit_price), vatRate:15, unitCode:'PCE'
   }));
   if (!items.length) throw Error('Add at least one invoice line item.');
   const source = {
-    kind, id: clean(doc.reference) || 'DEMO-NOT-ISSUED', uuid:uid(),
+    kind:'standard', id: clean(doc.reference) || 'DEMO-NOT-ISSUED', uuid:uid(),
     issueDate:doc.date, issueTime:/^\d\d:\d\d$/.test(clean(doc.invoice_time)) ? `${doc.invoice_time}:00` : undefined,
     seller:{name:clean(doc.seller_name),vat:clean(doc.seller_vat)},
     buyer:{name:clean(doc.buyer_name || doc.name) || 'Demo buyer',vat:clean(doc.buyer_vat) || undefined},
