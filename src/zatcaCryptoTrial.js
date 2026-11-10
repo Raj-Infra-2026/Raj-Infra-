@@ -21,8 +21,8 @@ export async function buildCryptoTrialQr(doc,kind='standard'){
   const xml=createDraftInvoiceXml(doc,kind);
   const digest=new Uint8Array(await crypto.subtle.digest('SHA-256',te.encode(xml)));
   const keys=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},false,['sign','verify']);
-  const sig=new Uint8Array(await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},keys.privateKey,digest));
-  const valid=await crypto.subtle.verify({name:'ECDSA',hash:'SHA-256'},keys.publicKey,sig,digest);
+  const sig=new Uint8Array(await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},keys.privateKey,te.encode(xml)));
+  const valid=await crypto.subtle.verify({name:'ECDSA',hash:'SHA-256'},keys.publicKey,sig,te.encode(xml));
   if(!valid||sig.length!==64)throw Error('Cryptographic trial signature failed local verification');
   const pub=new Uint8Array(await crypto.subtle.exportKey('raw',keys.publicKey));
   const amount=Number(doc.amount),vat=Number(doc.vat_amount);
