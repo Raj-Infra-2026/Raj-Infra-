@@ -27,7 +27,11 @@ export async function buildCryptoTrialQr(doc,kind='standard'){
   const pub=new Uint8Array(await crypto.subtle.exportKey('raw',keys.publicKey));
   const amount=Number(doc.amount),vat=Number(doc.vat_amount);
   if(!Number.isFinite(amount)||!Number.isFinite(vat)||amount<0||vat<0)throw Error('Invalid invoice totals');
-  const stamp=new Date().toISOString().replace(/\.\d{3}Z$/,'Z');
+  // Match the QR timestamp to the invoice date and Saudi local document time.
+  // A preview is never an issued invoice, regardless of the timestamp format.
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(doc.date||''))) throw Error('Valid invoice date required');
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(String(doc.invoice_time||''))) throw Error('Valid Saudi invoice time required');
+  const stamp=`${doc.date}T${doc.invoice_time}:00+03:00`; 
   const qr=tlv([
     [1,te.encode(String(doc.seller_name).trim())],[2,te.encode(String(doc.seller_vat))],
     [3,te.encode(stamp)],[4,te.encode(amount.toFixed(2))],[5,te.encode(vat.toFixed(2))],
