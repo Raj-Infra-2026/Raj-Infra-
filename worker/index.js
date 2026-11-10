@@ -188,7 +188,8 @@ async function sheet(env, table, method = 'GET', range = 'A:I', body) {
 // Single-company profile, stored in the existing spreadsheet. Only Admin may update it.
 const COMPANY_FIELDS = [
     'name_en', 'name_ar', 'vat_number', 'cr_number', 'website', 'address',
-    'city', 'district', 'postal_code', 'phone', 'email', 'logo_data', 'primary_color', 'secondary_color'
+    'city', 'district', 'postal_code', 'phone', 'email', 'logo_data', 'primary_color', 'secondary_color',
+    'invoice_prefix', 'invoice_identifier', 'invoice_include_year', 'invoice_start_number'
 ];
 const COMPANY_HEADERS = ['field', 'value'];
 
@@ -243,6 +244,12 @@ function validateCompanySettings(data) {
     const profile = Object.fromEntries(COMPANY_FIELDS.map(field => [
         field, String(data[field] ?? '').trim().slice(0, field === 'logo_data' ? 45000 : 500)
     ]));
+    profile.invoice_prefix = (profile.invoice_prefix || 'AP').toUpperCase();
+    profile.invoice_identifier = (profile.invoice_identifier || 'INV').toUpperCase();
+    profile.invoice_include_year = profile.invoice_include_year === 'false' ? 'false' : 'true';
+    profile.invoice_start_number = profile.invoice_start_number || '1';
+    if (!/^[A-Z0-9]{1,12}$/.test(profile.invoice_prefix) || !/^[A-Z0-9]{1,12}$/.test(profile.invoice_identifier)) throw Error('Invoice prefix and identifier must contain 1-12 letters or digits');
+    if (!/^[1-9]\d{0,11}$/.test(profile.invoice_start_number) || !Number.isSafeInteger(Number(profile.invoice_start_number))) throw Error('Invalid invoice starting number');
     if (profile.logo_data && (!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(profile.logo_data) || profile.logo_data.length > 45000)) throw Error('Logo must be a small PNG, JPG, or WebP image');
     for (const field of ['primary_color','secondary_color']) if (profile[field] && !/^#[a-fA-F0-9]{6}$/.test(profile[field])) throw Error('Invalid theme color');
     if (!/^\d{15}$/.test(profile.vat_number))
@@ -575,12 +582,24 @@ export default { async fetch(req, env) {
                         throw Error('Select a valid client');
                 }
                 if (table === 'Invoices') {
-                    // Tenant-scoped sequence. Google Sheets has no atomic counter; simultaneous writes
-                    // can race. Production deployments requiring strict uniqueness need a lock service.
+                    // Company-specific invoice numbering. Existing numbers are never rewritten.
+                    const settings = await getCompanySettings(env);
+                    const prefix = (settings.invoice_prefix || 'AP').toUpperCase();
+                    const identifier = (settings.invoice_identifier || 'INV').toUpperCase();
+                    const includeYear = settings.invoice_include_year !== 'false';
+                    const start = Number(settings.invoice_start_number || '1');
                     const previous = await records(env, 'Invoices');
-                    const numbers = previous.map(x => /^AP-INV-(\d+)$/.exec(x.reference || '')).filter(Boolean).map(m => Number(m[1]));
-                    const next = Math.max(0, ...numbers) + 1;
-                    rec.reference = 'AP-INV-' + String(next).padStart(4, '0');
+                    // Continue the sequence across year/prefix changes, including legacy AP-INV numbers.
+                    // Only count values that match the recognized invoice-number structure.
+                    const numbers = previous.map(x => {
+                        const match = /^[A-Z0-9]{1,12}-[A-Z0-9]{1,12}-(?:(?:\d{4})-)?(\d+)$/i.exec(String(x.reference || '').trim());
+                        return match ? Number(match[1]) : 0;
+                    }).filter(n => Number.isSafeInteger(n) && n >= 0);
+                    const next = Math.max(start - 1, 0, ...numbers) + 1;
+                    if (!Number.isSafeInteger(next)) throw Error('Invoice sequence exhausted');
+                    const yearPart = includeYear ? new Date().getUTCFullYear() + '-' : '';
+                    rec.reference = prefix + '-' + identifier + '-' + yearPart + String(next).padStart(4, '0');
+
                 }
                 if (!rec.reference || /^(draft|preview)$/i.test(rec.reference.trim()))
                     rec.reference = (table === 'Invoices' ? 'INV' : table === 'ProformaInvoices' ? 'PI' : table === 'DeliveryNotes' ? 'DN' : table.slice(0, 3).toUpperCase()) + '-' + new Date().getUTCFullYear() + '-' + rec.id.slice(0, 12).toUpperCase();

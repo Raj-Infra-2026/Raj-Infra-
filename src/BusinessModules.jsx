@@ -303,6 +303,14 @@ export function CompanySettingsPage({ request, onChanged }) {
                     </label>
                 )}
             </div>
+            <div className="company-profile-fields" style={{marginTop:24}}>
+                <div className="profile-wide"><h3>Invoice Number Settings</h3><p>Set the format for future invoices. Existing invoice numbers remain unchanged.</p></div>
+                <label><span>Company Prefix</span><input maxLength={12} required pattern="[A-Za-z0-9]{1,12}" value={profile.invoice_prefix ?? 'AP'} onChange={e=>setProfile(v=>({...v,invoice_prefix:e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'')}))}/></label>
+                <label><span>Document Identifier</span><input maxLength={12} required pattern="[A-Za-z0-9]{1,12}" value={profile.invoice_identifier ?? 'INV'} onChange={e=>setProfile(v=>({...v,invoice_identifier:e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'')}))}/></label>
+                <label><span>Starting Sequence Number</span><input type="number" min="1" step="1" max="999999999999" required value={profile.invoice_start_number ?? '1'} onChange={e=>setProfile(v=>({...v,invoice_start_number:e.target.value}))}/></label>
+                <label><span>Include Current Year</span><select value={profile.invoice_include_year ?? 'true'} onChange={e=>setProfile(v=>({...v,invoice_include_year:e.target.value}))}><option value="true">Yes</option><option value="false">No</option></select></label>
+                <div className="profile-wide"><strong>Example: {(profile.invoice_prefix || 'AP')}-{(profile.invoice_identifier || 'INV')}-{(profile.invoice_include_year ?? 'true') !== 'false' ? new Date().getFullYear() + '-' : ''}{String(Math.max(1,Number(profile.invoice_start_number)||1)).padStart(4,'0')}</strong><p>Numbers continue automatically beyond 9999 and across years. A higher starting number will not reset an existing sequence.</p></div>
+            </div>
             {error && <div className="notice error" role="alert">{error}</div>}
             {message && <div className="notice" role="status">{message}</div>}
             <div className="company-profile-footer">
@@ -652,6 +660,14 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
                             </label>
                         ))}
                     </div>
+                    <h4>Invoice Number Settings</h4>
+                    <div className="company-settings-grid">
+                        <label>Company Prefix<input maxLength={12} value={company?.invoice_prefix ?? 'AP'} onChange={e=>setCompany(v=>({...v,invoice_prefix:e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'')}))}/></label>
+                        <label>Invoice Identifier<input maxLength={12} value={company?.invoice_identifier ?? 'INV'} onChange={e=>setCompany(v=>({...v,invoice_identifier:e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'')}))}/></label>
+                        <label>Starting Number<input type="number" min="1" step="1" value={company?.invoice_start_number ?? '1'} onChange={e=>setCompany(v=>({...v,invoice_start_number:e.target.value}))}/></label>
+                        <label>Include Year<select value={company?.invoice_include_year ?? 'true'} onChange={e=>setCompany(v=>({...v,invoice_include_year:e.target.value}))}><option value="true">Yes</option><option value="false">No</option></select></label>
+                    </div>
+                    <p>Example: {(company?.invoice_prefix || 'AP')}-{(company?.invoice_identifier || 'INV')}-{(company?.invoice_include_year ?? 'true') !== 'false' ? new Date().getFullYear() + '-' : ''}{String(Math.max(1,Number(company?.invoice_start_number)||1)).padStart(4,'0')}</p>
                     <div className="company-settings-actions">
                         <button type="button" className="secondary" onClick={() => setShowCompanySettings(false)}>Cancel</button>
                         <button type="button" className="primary" disabled={companySaving || !company?.cr_number || !/^\d{15}$/.test(company?.vat_number || '')} onClick={saveCompanySettings}>
