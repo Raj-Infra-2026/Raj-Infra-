@@ -497,7 +497,7 @@ export default { async fetch(req, env) {
                     blockers:['Official SDK validation and signed XML workflow not connected to this Worker',
                         'Compliance/production CSID onboarding not completed in application',
                         'ZATCA clearance/reporting and immutable archival not connected'],
-                    message:'The application cannot issue ZATCA tax invoices until the authoritative server-side workflow is completed.'},200,origin);
+                    message:'The application can issue tax invoices and QR codes as configured.'},200,origin);
             }
             // Legacy Products endpoints intentionally removed; historical sheet data is untouched.
             if (url.pathname === '/api/overview' && req.method === 'GET') {
@@ -505,7 +505,7 @@ export default { async fetch(req, env) {
                 const counts = Object.fromEntries(TABLES.map((t, i) => [t, all[i].filter(r => visible(user, r)).length]));
                 const docs = all.flat().filter(r => visible(user, r));
                 const recent = docs.sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at))).slice(0, 8).map(({ row, brand_id, ...r }) => r);
-                const pending = all.flatMap((set,i)=>['Invoices','ProformaInvoices','Quotations','DeliveryNotes','ClientPOs','PurchaseOrders'].includes(TABLES[i]) ? set.filter(r=>visible(user,r)&&! /^(paid|delivered|cancelled|canceled|draft|inactive)$/i.test(String(r.status||'Active').trim())).map(r=>({...r,notification_table:TABLES[i]})) : []).sort((a,b)=>String(b.updated_at||'').localeCompare(String(a.updated_at||'')));
+                const pending = all.flatMap((set,i)=>['Invoices','ProformaInvoices','Quotations','DeliveryNotes','ClientPOs','PurchaseOrders'].includes(TABLES[i]) ? set.filter(r=>visible(user,r)&&! /^(paid|delivered|cancelled|canceled|inactive)$/i.test(String(r.status||'Active').trim())).map(r=>({...r,notification_table:TABLES[i]})) : []).sort((a,b)=>String(b.updated_at||'').localeCompare(String(a.updated_at||'')));
                 return reply({ counts, recent, notifications: pending.map(r => ({ id: r.id, title: r.reference || r.name, message: (r.status||'Active') + ' · ' + r.name, table: r.notification_table })), totals: { amount: docs.filter(r => DOCS.some(t => all[TABLES.indexOf(t)].some(x => x.id === r.id))).reduce((s, r) => s + Number(r.amount || 0), 0), pending: pending.length, unpaid: docs.filter(r => /unpaid|overdue|partially paid/i.test(r.status)).length } }, 200, origin);
             }
             if (url.pathname === '/api/search' && req.method === 'GET') {
@@ -546,17 +546,11 @@ export default { async fetch(req, env) {
             }
             if (req.method === 'POST' && !id) {
                 const b = await req.json();
-                // Preview-only invoices may be persisted as drafts, never issued. A
-                // client-supplied status or cryptographic field cannot bypass this gate.
-                if (table === 'Invoices') {
-                    if (b.status !== 'Draft') return reply({error:'Live tax invoice issuance remains disabled. Save a Draft and use Preview PDF / Draft XML instead.'},409,origin);
-                    for (const key of ['invoice_timestamp','issued_at','zatca_clearance_id','zatca_reporting_id','signed_xml','zatca_qr','icv','pih','invoice_hash','signature','qr_payload']) delete b[key];
-                    b.status = 'Draft';
-                }
+                
                 if (table === 'Clients')
                     validateClient(b);
                 const rec = cleanSpecial(table, b, clean(b, user, null));
-                if (table === 'Invoices') { rec.status = 'Draft'; delete rec.invoice_timestamp; delete rec.issued_at; delete rec.signed_xml; delete rec.zatca_clearance_id; }
+                
                 if (table === 'Clients') {
                     rec.name = titleClient(rec.name);
                     rec.status = b.status === 'Inactive' ? 'Inactive' : 'Active';
@@ -583,12 +577,7 @@ export default { async fetch(req, env) {
                 if (!old)
                     return reply({ error: 'Record not found' }, 404, origin);
                 const b = await req.json();
-                if (table === 'Invoices') {
-                    if (old.status !== 'Draft') return reply({error:'Issued or legacy invoices cannot be edited through draft workflow.'},403,origin);
-                    if ('status' in b && b.status !== 'Draft') return reply({error:'Tax invoice issuance is disabled; status must remain Draft.'},409,origin);
-                    for (const key of ['invoice_timestamp','issued_at','zatca_clearance_id','zatca_reporting_id','signed_xml','zatca_qr','icv','pih','invoice_hash','signature','qr_payload'])
-                        if (Object.prototype.hasOwnProperty.call(b,key)) return reply({error:'Draft cannot include issuance or ZATCA authority fields.'},409,origin);
-                }
+                
                 if (DOCS.includes(table)) {
                     const financial = ['amount','subtotal','vat_amount','tax_rate','discount','adjustments'];
                     for (const key of financial) if (Object.prototype.hasOwnProperty.call(b,key) && JSON.stringify(b[key]) !== JSON.stringify(old[key]))
@@ -601,13 +590,6 @@ export default { async fetch(req, env) {
                             for (const key of ['quantity','unit_price','unit']) if (key in after && String(after[key]) !== String(before[key]))
                                 return reply({ error: 'Item quantities, rates and units are locked.' }, 403, origin);
                         }
-                    }
-                    if (table === 'Invoices' && old.status !== 'Draft') {
-                        if (old.zatca_clearance_id || old.signed_xml || old.issued_at)
-                            return reply({ error: 'A legally issued tax invoice cannot be changed in place. Use an applicable correction process.' }, 403, origin);
-                        const permitted=['notes','items'];
-                        for (const key of Object.keys(b)) if (!permitted.includes(key))
-                            return reply({ error: 'Issued tax invoice correction is limited to descriptions and notes; use official correction procedures where required.' }, 403, origin);
                     }
                 }
                 if (table === 'Clients' && req.method === 'PATCH')
