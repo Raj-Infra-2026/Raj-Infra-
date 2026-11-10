@@ -1,4 +1,4 @@
-/** ALIF LABS V5.3 — A4 bilingual invoice render, shared by Preview and Download.
+/** ALIF SYNC V5.3 — A4 bilingual invoice render, shared by Preview and Download.
  * Uses a browser-rendered canvas PDF. A preview is NEVER an issued tax invoice.
  * Do not use a browser-generated demo QR as evidence of ZATCA Phase 2 acceptance.
  */

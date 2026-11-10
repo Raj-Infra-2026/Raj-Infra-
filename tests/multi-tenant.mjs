@@ -1,4 +1,4 @@
-/** Offline ALIF LABS integration tests. Does not contact Google or ZATCA. */
+/** Offline ALIF SYNC integration tests. Does not contact Google or ZATCA. */
 import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
 import worker from '../worker/index.js';

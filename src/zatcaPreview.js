@@ -25,7 +25,7 @@ export function createDraftInvoiceXml(doc) {
   };
   const xml=buildUnsignedInvoiceDraft(source);
   return xml.replace('<?xml version="1.0" encoding="UTF-8"?>',
-    '<?xml version="1.0" encoding="UTF-8"?>\n<!-- ALIF LABS DEMO DRAFT - UNSIGNED - NOT ISSUED - NOT SUBMITTED OR CLEARED BY ZATCA -->');
+    '<?xml version="1.0" encoding="UTF-8"?>\n<!-- ALIF SYNC DEMO DRAFT - UNSIGNED - NOT ISSUED - NOT SUBMITTED OR CLEARED BY ZATCA -->');
 }
 export function downloadDraftInvoiceXml(doc) {
   const xml=createDraftInvoiceXml(doc);

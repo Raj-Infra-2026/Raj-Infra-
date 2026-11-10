@@ -1,0 +1,5 @@
+ALIF LABS -> ALIF SYNC: display branding update.
+Replace only the included files, preserving paths.
+Existing technical identifiers (worker name, CSS class names, storage keys, API names) remain unchanged to avoid breaking deployment or stored sessions.
+Previous invoice and multilingual search updates were used as the baseline.
+No runtime build or visual browser test has been performed.

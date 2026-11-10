@@ -79,7 +79,7 @@
  .adjustment-row { grid-template-columns: minmax(0,1fr) minmax(100px,1fr) 38px; }
 }
 
-/* ALIF LABS — consistent invoice adjustments and company profile */
+/* ALIF SYNC — consistent invoice adjustments and company profile */
 .business-modal .adjustment-editor { width: 100%; min-width: 0; }
 .business-modal .adjustment-row {
     display: grid;
@@ -221,7 +221,7 @@
 }
 
 
-/* ALIF LABS | Invoice Builder refinement (scoped; delivery notes unaffected) */
+/* ALIF SYNC | Invoice Builder refinement (scoped; delivery notes unaffected) */
 .invoice-redesign {
   width: min(1120px, calc(100vw - 32px));
   max-height: min(94dvh, 1100px);
@@ -414,7 +414,7 @@
 /* Manual document line items — clear spacing and responsive fields. */
 .business-line.manual-line{display:grid;grid-template-columns:minmax(0,2fr) minmax(110px,1fr) minmax(140px,1fr) auto;gap:16px;align-items:end}.business-line.manual-line .invoice-line-number{grid-column:1/-1}.business-line.manual-line label{min-width:0}.business-line.manual-line .description-editor textarea{min-height:110px;width:100%;resize:vertical}.invoice-notes-field{display:flex;flex-direction:column;gap:8px}.invoice-notes-field textarea{width:100%;min-height:100px;resize:vertical}@media(max-width:760px){.business-line.manual-line{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.business-line.manual-line .description-editor{grid-column:1/-1}}
 
-/* ALIF LABS public SaaS identity — unified owner dashboard */
+/* ALIF SYNC public SaaS identity — unified owner dashboard */
 .alif-public{min-height:100vh;background:#090f1e;color:#f7f5f1;font-family:'DM Sans',sans-serif;overflow:hidden;position:relative}
 .alif-public::before{content:'';position:absolute;top:-250px;right:-240px;width:940px;height:900px;background:radial-gradient(circle,#8d6b3524 0%,#18213944 34%,transparent 68%);pointer-events:none}
 .alif-public-nav{position:relative;z-index:4;max-width:1440px;margin:auto;min-height:88px;padding:16px clamp(20px,5vw,75px);display:flex;align-items:center;justify-content:space-between;gap:22px;border-bottom:1px solid #e6d6b21e}
@@ -438,7 +438,7 @@
 @media(max-width:920px){.alif-nav-links{display:none}.alif-hero{grid-template-columns:1fr;gap:12px;padding-top:65px}.alif-signature-art{height:315px}.alif-art-letter{font-size:215px}.alif-feature-band{grid-template-columns:1fr}.alif-access-area{grid-template-columns:1fr;gap:30px;max-width:650px}.alif-access-intro h1{font-size:44px}}
 @media(max-width:600px){.alif-public-nav{min-height:75px;gap:8px;padding:12px 16px}.alif-wordmark{font-size:13px;letter-spacing:.12em;gap:9px}.alif-wordmark .alif-monogram{width:36px;height:36px}.alif-nav-buttons{gap:7px}.alif-nav-buttons .alif-outline,.alif-nav-buttons .alif-gold{font-size:11px;min-height:36px;padding:0 10px}.alif-hero{padding:54px 20px 35px;min-height:auto}.alif-hero h1{font-size:42px}.alif-hero-actions{margin:24px 0}.alif-gold.large,.alif-outline.large{width:100%}.alif-signature-art{height:280px}.alif-art-caption{font-size:14px}.alif-feature-band{margin-bottom:30px}.alif-access-area{padding:35px 15px;gap:32px}.alif-access-card{padding:24px 18px}.alif-form-two{grid-template-columns:1fr}.alif-public-footer{gap:15px;padding:20px 14px;flex-wrap:wrap}}
 
-/* ALIF LABS — cinematic public experience. Scoped to public portal only. */
+/* ALIF SYNC — cinematic public experience. Scoped to public portal only. */
 .cinematic-public{--cin-bg:#070a12;--cin-ink:#f3f6fd;--cin-muted:#a9b4c8;--cin-accent:#bcd5f8;--cin-panel:rgba(17,24,40,.74);--cin-border:rgba(189,210,243,.20);--cin-button:#dce9fa;background:var(--cin-bg);color:var(--cin-ink);isolation:isolate;transition:background .35s,color .35s}
 .cinematic-public[data-public-theme="light"]{--cin-bg:#f1f5fa;--cin-ink:#152238;--cin-muted:#4b5b71;--cin-accent:#345e96;--cin-panel:rgba(255,255,255,.80);--cin-border:rgba(44,74,119,.19);--cin-button:#1e385b}
 .cinematic-public::before{background:radial-gradient(circle at 80% 18%,rgba(78,123,190,.22),transparent 58%)}
@@ -554,7 +554,7 @@
 .app-shell .role-admin .hero{border-color:var(--hero-border)}
 @media(max-width:700px){.app-shell .v4-toolbar{align-items:stretch;flex-direction:column}.app-shell .v4-toolbar .inline-search{width:100%}}
 
-/* ALIF LABS V4.1 | Visible client-workspace crimson+charcoal identity */
+/* ALIF SYNC V4.1 | Visible client-workspace crimson+charcoal identity */
 .app-shell.role-admin{--accent:#ce3344;--accent2:#fa6b78;--button-text:#fff;--hero-bg:#252528;--hero-border:#a53b48;--soft:#392a30;--flame-low:#a72c3c;--flame-high:#f2717b}
 .app-shell.role-admin[data-theme=light]{--accent:#b62839;--accent2:#d84957;--button-text:#fff;--hero-bg:#2a292d;--hero-border:#b94956;--soft:#faecee;--flame-low:#a32635;--flame-high:#eb6775}
 .app-shell.role-admin .brand-logo .alif-monogram,.app-shell.role-admin .alif-monogram{background:linear-gradient(135deg,#f16b76,#b22236);box-shadow:0 9px 28px #ae223d44}
@@ -572,7 +572,7 @@
 .app-shell.role-admin .client-history-kpis>div{box-shadow:inset 3px 0 0 #bd3043}
 @media(prefers-reduced-motion:no-preference){.app-shell.role-admin .records-panel .v4-toolbar button:hover{transform:translateY(-2px)}}
 
-/* ALIF LABS V4.2 — tenant theme, legible filters, workspace brand */
+/* ALIF SYNC V4.2 — tenant theme, legible filters, workspace brand */
 .app-shell.role-admin{--accent:var(--company-primary,#bf3046)!important;--accent2:var(--company-primary,#bf3046)!important}
 .app-shell.role-admin[data-theme="light"]{--bg:var(--company-secondary,#f5f5f5)!important}
 .app-shell.role-admin .hero-button,.app-shell.role-admin button.primary,.app-shell.role-admin .nav-link.active{background:var(--company-primary,#bf3046)!important;color:var(--company-ink,#fff)!important;border-color:transparent!important}

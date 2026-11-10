@@ -494,7 +494,7 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
         <div className={"record-modal business-modal " + (invoice ? "invoice-redesign" : "delivery-modal")} role="dialog" aria-modal="true" aria-label={invoice ? 'Invoice builder' : 'Delivery note builder'}>
             <div className="modal-header">
                 <div>
-                    <span className="overline">ALIF LABS / {proforma ? 'PROFORMA BUILDER' : invoice ? 'INVOICE BUILDER' : 'DELIVERY NOTE BUILDER'}</span>
+                    <span className="overline">ALIF SYNC / {proforma ? 'PROFORMA BUILDER' : invoice ? 'INVOICE BUILDER' : 'DELIVERY NOTE BUILDER'}</span>
                     <h2>{editing ? 'Edit ' : 'New '}{proforma ? 'Proforma Invoice' : invoice ? 'Invoice' : 'Delivery Note'}</h2>
                 </div>
                 <button type="button" className="icon-btn" onClick={close}><X /></button>

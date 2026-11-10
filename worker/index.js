@@ -13,7 +13,7 @@ function matchesSearch(value, query) {
   return tokens.every(token => haystack.includes(token));
 }
 
-/* ALIF LABS multi-company API. Credentials are server-side only.
+/* ALIF SYNC multi-company API. Credentials are server-side only.
    Public registration uses a master spreadsheet; each authenticated tenant gets its own sheet. */
 const TABLES = ['Clients', 'Quotations', 'ProformaInvoices', 'Invoices', 'DeliveryNotes', 'ClientPOs', 'Vendors', 'PurchaseOrders'];
 const DOCS = ['Quotations', 'ProformaInvoices', 'Invoices', 'DeliveryNotes', 'ClientPOs', 'PurchaseOrders'];
@@ -427,7 +427,7 @@ async function masterClients(env) {
     const response = await googleSheetsRequest(url, { headers: { authorization: `Bearer ${access}` } }, 'master Clients');
     const rows = response.values || [];
     if (!rows.length || REGISTRY_HEADERS.some((v,i)=>rows[0][i] !== v)) {
-        const err = Error('Master Clients headers are missing or mismatched. Run ALIF LABS master setup.');
+        const err = Error('Master Clients headers are missing or mismatched. Run ALIF SYNC master setup.');
         err.status = 503;
         throw err;
     }
@@ -461,7 +461,7 @@ async function loginCompany(env, body) {
     const tenant = (await masterClients(env)).find(r => r.email === email);
     if (!tenant || !await passwordOK(tenant, body.password)) return { status: 401, error: 'Incorrect email or password.' };
     if (tenant.status !== 'Active') return { status: 403, error: 'Your account is pending approval or inactive.' };
-    if (!tenant.spreadsheet_id || tenant.provision_state !== 'Ready') return { status: 503, error: 'Account approved; workspace provisioning is not complete. Please contact ALIF LABS support.' };
+    if (!tenant.spreadsheet_id || tenant.provision_state !== 'Ready') return { status: 503, error: 'Account approved; workspace provisioning is not complete. Please contact ALIF SYNC support.' };
     const payload = { tenant_id: tenant.tenant_id, username: tenant.email, role: 'admin', exp: Date.now() + 8 * 3600000 };
     return { status: 200, token: await sign(payload, env.AUTH_SECRET), user: { username:tenant.email, company_name:tenant.company_name, role:'admin' } };
 }
