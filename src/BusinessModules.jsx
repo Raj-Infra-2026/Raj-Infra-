@@ -124,7 +124,14 @@ const saudiTime = () => new Intl.DateTimeFormat('en-GB', {timeZone:'Asia/Riyadh'
 
 export function invoiceQrPayload(doc) {
     if (!doc?.seller_name || !/^[0-9]{15}$/.test(String(doc.seller_vat || ''))) return '';
-    const timestamp = String(doc.invoice_timestamp || doc.issued_at || new Date().toISOString());
+    // For an unissued invoice preview, reflect the user's selected invoice date/time.
+    // Once issued, preserve the genuine issuance timestamp in the ZATCA QR.
+    const selectedDate = String(doc.date || '');
+    const selectedTime = String(doc.invoice_time || '');
+    const validDate = /^\d{4}-\d{2}-\d{2}$/.test(selectedDate) && !Number.isNaN(Date.parse(`${selectedDate}T00:00:00Z`));
+    const validTime = /^([01]\d|2[0-3]):[0-5]\d$/.test(selectedTime);
+    const previewTimestamp = validDate && validTime ? `${selectedDate}T${selectedTime}:00+03:00` : '';
+    const timestamp = String(doc.invoice_timestamp || doc.issued_at || previewTimestamp || new Date().toISOString());
     const values = [String(doc.seller_name), String(doc.seller_vat), timestamp, num(doc.amount).toFixed(2), num(doc.vat_amount).toFixed(2)];
     const encoder = new TextEncoder();
     const bytes = [];
