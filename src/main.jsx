@@ -332,8 +332,20 @@ function Preferences({theme,setTheme,role,collapsed,setCollapsed,request,profile
   const [busy,setBusy]=useState(false),[notice,setNotice]=useState('');
   useEffect(()=>{setPrimary(profile.primary_color||'#bf3046');setSecondary(profile.secondary_color||'#f5f5f5')},[profile.primary_color,profile.secondary_color]);
   async function saveColors(){setBusy(true);setNotice('');try{const result=await request('/company-settings',{method:'PUT',body:JSON.stringify({...profile,primary_color:primary,secondary_color:secondary})});onChanged(result.company);setNotice('Company theme saved for this workspace.');}catch(e){setNotice(e.message)}finally{setBusy(false)}}
+  async function resetColors(){
+    if(role!=='admin'||busy)return;
+    setBusy(true);setNotice('');
+    try{
+      const defaultPrimary='#bf3046';
+      const defaultSecondary='#f5f5f5';
+      const result=await request('/company-settings',{method:'PUT',body:JSON.stringify({...profile,primary_color:defaultPrimary,secondary_color:defaultSecondary})});
+      setPrimary(defaultPrimary);setSecondary(defaultSecondary);
+      onChanged(result.company);
+      setNotice('Dashboard colors restored to the original defaults.');
+    }catch(e){setNotice(e.message)}finally{setBusy(false)}
+  }
   return <div className="settings-grid v44-preferences"><section className="surface-panel"><h3>Appearance</h3><div className="theme-options"><button className={theme==='dark'?'selected':''} onClick={()=>setTheme('dark')}><Moon/> Dark mode</button><button className={theme==='light'?'selected':''} onClick={()=>setTheme('light')}><Sun/> Light mode</button></div></section>
-  <section className="surface-panel company-theme-studio"><h3>Company Theme Studio</h3><div className="company-palette-fields"><label>Primary accent<input type="color" value={primary} onChange={e=>setPrimary(e.target.value)}/><code>{primary}</code></label><label>Text color<input type="color" value={secondary} onChange={e=>setSecondary(e.target.value)}/><code>{secondary}</code></label></div><div className="company-theme-preview" style={{background:theme==='light'?'#f5f5f5':'#242528'}}><span style={{background:primary,color:'#fff',padding:12,borderRadius:9}}>Workspace accent</span><span style={{color:readableTextColor(secondary,theme==='light'?'#f5f5f5':'#242528')}}>Live text preview</span></div><button className="primary" disabled={busy||role!=='admin'} onClick={saveColors}>{busy?'Saving…':'Save company colors'}</button>{notice&&<p role="status">{notice}</p>}</section>
+  <section className="surface-panel company-theme-studio"><h3>Company Theme Studio</h3><div className="company-palette-fields"><label>Primary accent<input type="color" value={primary} onChange={e=>setPrimary(e.target.value)}/><code>{primary}</code></label><label>Text color<input type="color" value={secondary} onChange={e=>setSecondary(e.target.value)}/><code>{secondary}</code></label></div><div className="company-theme-preview" style={{background:theme==='light'?'#f5f5f5':'#242528'}}><span style={{background:primary,color:'#fff',padding:12,borderRadius:9}}>Workspace accent</span><span style={{color:readableTextColor(secondary,theme==='light'?'#f5f5f5':'#242528')}}>Live text preview</span></div><button className="primary" disabled={busy||role!=='admin'} onClick={saveColors}>{busy?'Saving…':'Save company colors'}</button><button type="button" className="secondary" disabled={busy||role!=='admin'} onClick={resetColors} style={{marginLeft:10}}>Reset to default colors</button>{notice&&<p role="status">{notice}</p>}</section>
   <section className="surface-panel"><h3>Navigation density</h3><div className="theme-options"><button className={!collapsed?'selected':''} onClick={()=>setCollapsed(false)}><PanelLeftOpen/> Expanded</button><button className={collapsed?'selected':''} onClick={()=>setCollapsed(true)}><PanelLeftClose/> Compact</button></div></section></div>;
 }
 const STEPS = [['Explore your workspace', 'Use the sidebar to open the modules available to your role.'], ['Find a client', 'Open Clients from the navigation or press Ctrl / ⌘ + K to search.'], ['Create a document', 'Choose New Invoice or New Delivery Note, then enter descriptions and quantities manually. Review before saving.'], ['Review your work', 'Use Workflow for invoice status updates, or Analytics for a summary of current records.']];
