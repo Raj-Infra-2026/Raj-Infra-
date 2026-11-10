@@ -20,6 +20,7 @@ async function verify(t, secret) { try {
     const p = JSON.parse(dec.decode(unb64(body)));
     return p.exp > Date.now() ? p : null;
 }
+   
 catch {
     return null;
 } }
