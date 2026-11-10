@@ -1,3 +1,5 @@
+> **V5.3:** Start with [`START_HERE_V5_3.md`](START_HERE_V5_3.md). Preview/demo invoices work; live ZATCA issuance remains blocked.
+
 # ALIF LABS — Multi-company SaaS
 
 ALIF LABS is a React/Vite website and unified Admin workspace, with a Cloudflare Worker backend and Google Sheets business storage.

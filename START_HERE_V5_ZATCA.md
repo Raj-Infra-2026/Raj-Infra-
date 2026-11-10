@@ -2,7 +2,7 @@
 
 This archive contains the complete ALIF LABS source (baseline + V4.3/V4.4/V4.5/V4.6 patches), plus ZATCA API gateway development code and onboarding/validation checklist.
 
-**CRITICAL: THIS SOFTWARE IS NOT YET PHASE 2 COMPLIANT, NOT CLEARED, AND MUST NOT BE USED FOR LIVE TAX INVOICES.** There are no customer-issued certificates, secure ECDSA/XAdES signing workflow, ZATCA SDK validation or final submission response in this archive. The app's invoice POST endpoint fails closed even if ALLOW_TAX_INVOICE_ISSUANCE is set.
+**CRITICAL: THIS SOFTWARE IS NOT YET PHASE 2 COMPLIANT, NOT CLEARED, AND MUST NOT BE USED FOR LIVE TAX INVOICES.** There are no customer-issued certificates, secure ECDSA/XAdES signing workflow, ZATCA SDK validation or final submission response in this archive. The app's invoice POST endpoint allows only Draft invoices for preview; actual issuance is blocked even if ALLOW_TAX_INVOICE_ISSUANCE is set.
 
 ## Developer entry points
 

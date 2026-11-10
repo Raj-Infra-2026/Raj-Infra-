@@ -61,15 +61,26 @@ try {
    status:'Active',seller_name:'Alpha Trading',seller_vat:'300000000000003',
    items:[{description:'Consulting',quantity:2,unit_price:250}]
  });
- assert.equal(createdInvoice.status,503,JSON.stringify(createdInvoice.data));
- assert.match(createdInvoice.data.error,/ZATCA Phase 2 integration is not complete/);
+ assert.equal(createdInvoice.status,409,JSON.stringify(createdInvoice.data));
+ assert.match(createdInvoice.data.error,/issuance remains disabled/i);
+ const draft=await call('/records/Invoices','POST',alice,{
+   name:'Customer One',client_id:add.data.record.id,date:'2026-11-03',invoice_time:'10:30',
+   status:'Draft',seller_name:'Alpha Trading',seller_vat:'300000000000003',
+   issued_at:'2026-11-03T10:30:00Z',signed_xml:'FAKE',zatca_clearance_id:'FAKE',
+   items:[{description:'Consulting',quantity:2,unit_price:250}]
+ });
+ assert.equal(draft.status,201,JSON.stringify(draft.data));
+ assert.equal(draft.data.record.status,'Draft');
+ assert.ok(!draft.data.record.issued_at && !draft.data.record.invoice_timestamp && !draft.data.record.signed_xml && !draft.data.record.zatca_clearance_id);
+ const escalation=await call('/records/Invoices/'+draft.data.record.id,'PATCH',alice,{status:'Active'});
+ assert.equal(escalation.status,409,JSON.stringify(escalation.data));
  const readiness=await call('/zatca/readiness','GET',alice);
  assert.equal(readiness.status,200);
  assert.equal(readiness.data.ready,false);
  assert.equal(readiness.data.canIssueTaxInvoices,false);
- assert.equal((await call('/records/Invoices','GET',alice)).data.records.length,0);
+ assert.equal((await call('/records/Invoices','GET',alice)).data.records.length,1);
  master[1][7]='Suspended';
  assert.equal((await call('/records/Clients','GET',alice)).status,401);
  assert.equal((await call('/records/Clients','GET',bob)).status,200);
- console.log('PASS: register, salted passwords, duplicate, pending, provisioning, login, isolation, block products, prevent premature tax invoice issuance, report ZATCA readiness, live suspension');
+ console.log('PASS: register, salted passwords, duplicate, pending, provisioning, login, isolation, block products, prevent premature tax invoice issuance while allowing safe drafts, report ZATCA readiness, live suspension');
 } finally { globalThis.fetch=fetchOriginal; }

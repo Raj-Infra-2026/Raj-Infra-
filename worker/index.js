@@ -20,8 +20,6 @@ async function verify(t, secret) { try {
     const p = JSON.parse(dec.decode(unb64(body)));
     return p.exp > Date.now() ? p : null;
 }
-   
-   
 catch {
     return null;
 } }
@@ -547,13 +545,18 @@ export default { async fetch(req, env) {
                 return reply({ records: data.filter(r => visible(user, r) && (!q || JSON.stringify(r).toLowerCase().includes(q))).slice(0, 1000).map(({ row, brand_id, ...r }) => r) }, 200, origin);
             }
             if (req.method === 'POST' && !id) {
-                if (table === 'Invoices')
-                    return reply({ error: 'ZATCA Phase 2 integration is not complete: invoice issuance remains disabled until signed XML, authority clearance/reporting, and immutable audit storage are implemented and verified.' }, 503, origin);
                 const b = await req.json();
+                // Preview-only invoices may be persisted as drafts, never issued. A
+                // client-supplied status or cryptographic field cannot bypass this gate.
+                if (table === 'Invoices') {
+                    if (b.status !== 'Draft') return reply({error:'Live tax invoice issuance remains disabled. Save a Draft and use Preview PDF / Draft XML instead.'},409,origin);
+                    for (const key of ['invoice_timestamp','issued_at','zatca_clearance_id','zatca_reporting_id','signed_xml','zatca_qr','icv','pih','invoice_hash','signature','qr_payload']) delete b[key];
+                    b.status = 'Draft';
+                }
                 if (table === 'Clients')
                     validateClient(b);
                 const rec = cleanSpecial(table, b, clean(b, user, null));
-                if (table === 'Invoices') rec.invoice_timestamp = new Date().toISOString();
+                if (table === 'Invoices') { rec.status = 'Draft'; delete rec.invoice_timestamp; delete rec.issued_at; delete rec.signed_xml; delete rec.zatca_clearance_id; }
                 if (table === 'Clients') {
                     rec.name = titleClient(rec.name);
                     rec.status = b.status === 'Inactive' ? 'Inactive' : 'Active';
@@ -580,6 +583,12 @@ export default { async fetch(req, env) {
                 if (!old)
                     return reply({ error: 'Record not found' }, 404, origin);
                 const b = await req.json();
+                if (table === 'Invoices') {
+                    if (old.status !== 'Draft') return reply({error:'Issued or legacy invoices cannot be edited through draft workflow.'},403,origin);
+                    if ('status' in b && b.status !== 'Draft') return reply({error:'Tax invoice issuance is disabled; status must remain Draft.'},409,origin);
+                    for (const key of ['invoice_timestamp','issued_at','zatca_clearance_id','zatca_reporting_id','signed_xml','zatca_qr','icv','pih','invoice_hash','signature','qr_payload'])
+                        if (Object.prototype.hasOwnProperty.call(b,key)) return reply({error:'Draft cannot include issuance or ZATCA authority fields.'},409,origin);
+                }
                 if (DOCS.includes(table)) {
                     const financial = ['amount','subtotal','vat_amount','tax_rate','discount','adjustments'];
                     for (const key of financial) if (Object.prototype.hasOwnProperty.call(b,key) && JSON.stringify(b[key]) !== JSON.stringify(old[key]))
