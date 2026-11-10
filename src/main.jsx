@@ -164,7 +164,7 @@ function PublicPortal({ onLogin, onRegister, busy, error }) {
     }
     return <div className="alif-public cinematic-public" data-public-theme={publicTheme}><div className="cinematic-atmosphere" aria-hidden="true"><span/><span/><span/></div>
       <header className="alif-public-nav">
-        <button type="button" className="alif-wordmark" onClick={()=>switchScreen('home')} aria-label="ALIF SYNC home"><AlifMonogram/><strong>ALIF <span>LABS</span></strong></button>
+        <button type="button" className="alif-wordmark" onClick={()=>switchScreen('home')} aria-label="ALIF SYNC home"><AlifMonogram/><strong>ALIF <span>SYNC</span></strong></button>
         <div className="alif-nav-links"><a href="/#platform" onClick={()=>switchScreen('home')}>Platform</a><a href="/#why-alif" onClick={()=>switchScreen('home')}>Why ALIF SYNC</a></div>
         <div className="alif-nav-buttons"><button type="button" className="alif-theme-toggle" onClick={() => setPublicTheme(t => t === 'dark' ? 'light' : 'dark')} aria-label={publicTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} title={publicTheme === 'dark' ? 'Light mode' : 'Dark mode'}>{publicTheme === 'dark' ? <Sun size={18}/> : <Moon size={18}/>}<span>{publicTheme === 'dark' ? 'Light' : 'Dark'}</span></button><button type="button" className="alif-outline" onClick={()=>switchScreen('login')}>Log in</button><button type="button" className="alif-gold" onClick={()=>switchScreen('register')}>Register <ArrowRight size={16}/></button></div>
       </header>
@@ -176,7 +176,7 @@ function PublicPortal({ onLogin, onRegister, busy, error }) {
             <div className="alif-hero-actions"><button type="button" className="alif-gold large" onClick={()=>switchScreen('register')}>Create your workspace <ArrowRight size={19}/></button><button type="button" className="alif-outline large" onClick={()=>switchScreen('login')}>Already a client? Sign in</button></div>
             
           </div>
-          <div className="alif-signature-art cinematic-signature city-stage" aria-label="Animated three-dimensional illuminated futuristic digital city"><DigitalCity theme={publicTheme}/><div className="alif-art-caption city-caption">ALIF <span>LABS</span></div></div>
+          <div className="alif-signature-art cinematic-signature city-stage" aria-label="Animated three-dimensional illuminated futuristic digital city"><DigitalCity theme={publicTheme}/><div className="alif-art-caption city-caption">ALIF <span>SYNC</span></div></div>
         </main>
         <section id="platform" className="alif-feature-band"><div className="alif-feature-card"><Receipt size={25}/><h3>Intelligent invoicing</h3></div><div className="alif-feature-card"><Users size={25}/><h3>Connected client records</h3></div><div className="alif-feature-card"><Building2 size={25}/><h3>Your own workspace</h3></div></section>
         
