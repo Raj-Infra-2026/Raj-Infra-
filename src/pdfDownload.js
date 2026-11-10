@@ -17,7 +17,7 @@ function makePdf(jpegs){
   const encoder=new TextEncoder(),parts=[];let len=0;const offsets=[];
   const push=b=>{const data=typeof b==='string'?encoder.encode(b):b;parts.push(data);len+=data.length};
   const obj=(id,data)=>{offsets[id]=len;push(`${id} 0 obj\n`);push(data);push('\nendobj\n')};
-  push('%PDF-1.4\n%ALIF\n');
+  push('%PDF-1.4\n');
   obj(1,'<< /Type /Catalog /Pages 2 0 R >>');
   obj(2,`<< /Type /Pages /Kids [ ${jpegs.map((_,i)=>3+3*i+' 0 R').join(' ')} ] /Count ${jpegs.length} >>`);
   jpegs.forEach((jpeg,i)=>{
@@ -75,9 +75,9 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup=''){
   function line(x,yy,end){ctx.strokeStyle=COLORS.rule;ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(x,yy);ctx.lineTo(end,yy);ctx.stroke()}
   function basePage(){
     const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;ctx=canvas.getContext('2d',{alpha:false});ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);
-    page++;ctx.fillStyle=COLORS.brand;ctx.fillRect(margin,57,5,50);label('ALIF LABS  •  BUSINESS DOCUMENTS',margin+20,88,19,true,COLORS.gray);
+    page++;ctx.fillStyle=COLORS.brand;ctx.fillRect(margin,57,5,50);
     ctx.fillStyle=COLORS.light;ctx.fillRect(margin,H-96,W-margin*2,37);
-    label(`${invoice && draft?'DRAFT / DEMO — NOT ISSUED':title}  ·  ${doc.reference||'Reference pending'}`,margin+12,H-72,16,true,COLORS.gray);
+    label(`${title}  ·  ${doc.reference||'Number assigned on submission'}`,margin+12,H-72,16,true,COLORS.gray);
     label(`Page ${page}`,right-12,H-72,16,false,COLORS.gray,'right');
     y=140;
     return canvas;
@@ -94,10 +94,10 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup=''){
   if(doc.seller_email)label(doc.seller_email,sx,290,16,false,COLORS.gray);
   label(title,right,177,38,true,COLORS.ink,'right');
   if(arabic)label(arabic,right,221,25,true,COLORS.ink,'right',true);
-  label(clean(doc.reference)||'DRAFT — NUMBER PENDING',right,258,17,true,COLORS.gray,'right');
-  if(draft){rect(margin,315,W-2*margin,52,'#fff2ec','#d9a496');label('DRAFT / DEMO — NOT ISSUED · NOT CLEARED OR REPORTED TO ZATCA',margin+16,348,19,true,COLORS.warn);}
+  label(clean(doc.reference)||'Number assigned on submission',right,258,17,true,COLORS.gray,'right');
+  if(draft){ctx.save();ctx.strokeStyle='#c52222';ctx.lineWidth=5;ctx.strokeRect(right-225,280,190,57);label('PREVIEW',right-208,319,31,true,'#c52222');ctx.restore();}
   const detailsY=draft?390:328;const metaW=(W-2*margin-18)/3;
-  const details=[['INVOICE DATE  /  تاريخ الفاتورة',pdfDate(doc.date)],['REFERENCE  /  رقم المرجع',doc.po_number||doc.reference_number||'—'],['DOCUMENT NUMBER  /  رقم الفاتورة',doc.reference||'Pending draft']];
+  const details=[['INVOICE DATE  /  تاريخ الفاتورة',pdfDate(doc.date)],['PO NUMBER  /  رقم أمر الشراء',doc.po_number||doc.reference_number||'—'],['DOCUMENT NUMBER  /  رقم الفاتورة',doc.reference||'Pending draft']];
   details.forEach(([heading,value],i)=>{const x=margin+i*(metaW+9);rect(x,detailsY,metaW,105);label(heading,x+12,detailsY+28,15,true,COLORS.gray);wrapText(value,x+12,detailsY+66,metaW-28,20,true,COLORS.ink,24,2)});
   const boxY=detailsY+128,boxW=(W-2*margin-14)/2,boxH=163;
   function entityBox(x,heading,name,address,vat,phone){rect(x,boxY,boxW,boxH,'#fff');rect(x+8,boxY+8,boxW-16,34,COLORS.light,null);label(heading,x+18,boxY+32,17,true);label(name||'—',x+18,boxY+66,21,true);wrapText(address||'—',x+18,boxY+92,boxW-36,16,false,COLORS.gray,21,2);if(vat)label('VAT: '+vat,x+18,boxY+148,15,false,COLORS.gray);else if(phone)label('Phone: '+phone,x+18,boxY+148,15,false,COLORS.gray)}
@@ -129,7 +129,6 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup=''){
     label('DOCUMENT QR  /  رمز الاستجابة السريعة',margin,y,18,true);
     if(qr){ctx.fillStyle='#fff';ctx.fillRect(margin+3,y+14,245,245);ctx.drawImage(qr,margin+3,y+14,245,245);}
     else {rect(margin+2,y+16,245,225,'#fff8f5','#e4bcad');wrapText('QR unavailable. Enter a genuine registered seller VAT number (15 digits, starting and ending with 3).',margin+16,y+58,220,17,true,COLORS.warn,23,7)}
-    wrapText('Preview-only QR. Scanner validation or Phase 2 approval is NOT claimed.',margin,y+289,390,16,false,COLORS.gray,21,2);
   }
   const sx2=755,sw=right-sx2;let sy=sumY;
   function amountLine(t,val,em=false){if(em)rect(sx2-12,sy-27,sw+12,39,'#e8eaef',null);label(t,sx2,sy,18,em);label(SAR(val),right-6,sy,18,true,COLORS.ink,'right');sy+=38;line(sx2-10,sy-10,right)}
@@ -142,10 +141,9 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup=''){
   line(margin,y,right);y+=38;label('AMOUNT IN WORDS  /  المبلغ كتابة',margin,y,17,true,COLORS.gray);y+=33;
   y=wrapText(moneyWords(total),margin,y,right-margin,18,false,COLORS.ink,25,2)+16;
   if(doc.notes){if(y+110>1620){nextPage();y=170;}line(margin,y,right);y+=34;label('NOTES  /  ملاحظات',margin,y,17,true);y+=32;y=wrapText(doc.notes,margin,y,right-margin,18,false,COLORS.ink,26,6)}
-  if(draft && y+42<1660)label('For demonstration only — no tax invoice has been issued or submitted.',margin,y+35,17,true,COLORS.warn);
   capture();
   const base=clean(doc.reference||'DRAFT-'+(doc.date||'document')).replace(/[^a-z0-9_-]/gi,'_').slice(0,70);
-  return new File([makePdf(jpegPages)],(draft?'DEMO_':'')+base+'.pdf',{type:'application/pdf'});
+  return new File([makePdf(jpegPages)],(draft?'PREVIEW_':'')+base+'.pdf',{type:'application/pdf'});
 }
 export async function downloadDocumentPdf(doc,kind='Invoices',qrMarkup=''){
   const file=await createDocumentPdfFile(doc,kind,qrMarkup);
