@@ -1,0 +1,19 @@
+{
+  "tags": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+  ],
+  "signatureVerified": true,
+  "invoiceHashBase64": "aGWyVN5nVxU8iqx2+sTufBPtav5BS/zuoLUOJm6r6EA=",
+  "hashMethod": "SHA256_RAW_TEST_XML_NOT_ZATCA_CANONICAL_HASH",
+  "signatureAlgorithm": "ECDSA-secp256k1-SHA256",
+  "tag9": "NOT_AVAILABLE_NO_ZATCA_CERTIFICATE",
+  "status": "OFFLINE_DEMO_ONLY_NOT_ZATCA_PHASE2_VALIDATED",
+  "warning": "Not an issued tax invoice. Does not implement XAdES, ZATCA invoice canonicalization, CSID, SDK checks or clearance."
+}
