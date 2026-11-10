@@ -261,7 +261,7 @@ function fromRow(r) { let extra = parseJSON(r[8] || '{}', {}); if (!extra || typ
 function toRow(r) { const { id, brand_id, reference, name, status, amount, date, updated_at, ...extra } = r; return [id || '', brand_id || '', reference || '', name || '', status || '', Number(amount) || 0, date || '', updated_at || new Date().toISOString(), JSON.stringify(extra)]; }
 async function records(env, table) { const r = await sheet(env, table); return (r.values || []).slice(1).map((cells, i) => ({ row: i + 2, ...fromRow(cells) })).filter(x => x.id && x.status !== 'Deleted'); }
 function visible(user, r) { return !!r.id && r.status !== 'Deleted'; }
-function clean(body, user, old) { const now = new Date().toISOString(); const fields = ['name', 'reference', 'status', 'amount', 'date', 'client_id', 'email', 'phone', 'address', 'vat_number', 'cr_number', 'project_location', 'same_as_office', 'po_number', 'reference_number', 'notes', 'due_date', 'items', 'discount', 'tax_rate', 'payment_terms', 'maps_url', 'invoice_time', 'invoice_timestamp', 'seller_name', 'seller_vat', 'seller_cr', 'seller_address', 'seller_phone', 'seller_email', 'buyer_name', 'buyer_vat', 'buyer_address', 'receiver_name', 'receiver_address', 'receiver_vat', 'subtotal', 'vat_amount', 'adjustments']; const r = { ...(old || {}) }; for (const f of fields)
+function clean(body, user, old) { const now = new Date().toISOString(); const fields = ['name', 'reference', 'status', 'amount', 'date', 'client_id', 'email', 'phone', 'address', 'vat_number', 'cr_number', 'project_location', 'same_as_office', 'po_number', 'reference_number', 'notes', 'due_date', 'items', 'discount', 'tax_rate', 'payment_terms', 'maps_url', 'invoice_time', 'invoice_timestamp', 'paid_amount', 'seller_name', 'seller_vat', 'seller_cr', 'seller_address', 'seller_phone', 'seller_email', 'buyer_name', 'buyer_vat', 'buyer_address', 'receiver_name', 'receiver_address', 'receiver_vat', 'subtotal', 'vat_amount', 'adjustments']; const r = { ...(old || {}) }; for (const f of fields)
     if (Object.prototype.hasOwnProperty.call(body, f))
         r[f] = body[f]; r.id = old?.id || crypto.randomUUID(); r.brand_id = old?.brand_id || ''; r.created_by = old?.created_by || user.username; r.created_at = old?.created_at || now; r.updated_at = now; r.name = String(r.name || '').trim().slice(0, 250); r.reference = String(r.reference || '').trim().slice(0, 80); r.status = String(r.status || 'Active').slice(0, 40); r.date = String(r.date || now.slice(0, 10)).slice(0, 10); r.amount = Number(r.amount || 0); if (!Number.isFinite(r.amount) || r.amount < 0 || r.amount > 1e12)
     throw Error('Invalid amount'); if (!r.name)
@@ -361,6 +361,16 @@ function cleanSpecial(table, b, r) {
         r.tax_rate = 15;
         r.discount = 0;
         r.amount = grand;
+        r.notes = String(r.notes || '').replace(/(?:\n|^)(?:Amount paid: SAR [\d,.]+\. Pending balance: SAR [\d,.]+\.)/g, '').trim();
+        if (r.status === 'Partially Paid') {
+            const paid = Number(r.paid_amount);
+            if (!Number.isFinite(paid) || paid <= 0 || paid >= grand)
+                throw Error('Partial payment must be greater than zero and less than invoice total');
+            r.paid_amount = Math.round(paid * 100) / 100;
+            const fmt = n => 'SAR ' + n.toLocaleString('en-SA', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            const note = `Amount paid: ${fmt(r.paid_amount)}. Pending balance: ${fmt(Math.round((grand-r.paid_amount)*100)/100)}.`;
+            r.notes = [r.notes, note].filter(Boolean).join('\n');
+        } else r.paid_amount = 0;
         r.document_type = table === 'ProformaInvoices' ? 'Proforma Invoice' : 'Tax Invoice';
         r.invoice_version = 2;
     }
@@ -563,6 +573,14 @@ export default { async fetch(req, env) {
                     const cs = await records(env, 'Clients');
                     if (!cs.some(c => c.id === rec.client_id))
                         throw Error('Select a valid client');
+                }
+                if (table === 'Invoices') {
+                    // Tenant-scoped sequence. Google Sheets has no atomic counter; simultaneous writes
+                    // can race. Production deployments requiring strict uniqueness need a lock service.
+                    const previous = await records(env, 'Invoices');
+                    const numbers = previous.map(x => /^AP-INV-(\d+)$/.exec(x.reference || '')).filter(Boolean).map(m => Number(m[1]));
+                    const next = Math.max(0, ...numbers) + 1;
+                    rec.reference = 'AP-INV-' + String(next).padStart(4, '0');
                 }
                 if (!rec.reference || /^(draft|preview)$/i.test(rec.reference.trim()))
                     rec.reference = (table === 'Invoices' ? 'INV' : table === 'ProformaInvoices' ? 'PI' : table === 'DeliveryNotes' ? 'DN' : table.slice(0, 3).toUpperCase()) + '-' + new Date().getUTCFullYear() + '-' + rec.id.slice(0, 12).toUpperCase();

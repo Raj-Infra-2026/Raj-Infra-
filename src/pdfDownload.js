@@ -10,7 +10,7 @@ const moneyWords = value => {
   const ones=['zero','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen'];
   const tens=['','','twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety'];
   function say(n){n=Math.floor(n);if(n<20)return ones[n];if(n<100)return tens[Math.floor(n/10)]+(n%10?' '+say(n%10):'');if(n<1000)return say(Math.floor(n/100))+' hundred'+(n%100?' '+say(n%100):'');if(n<1e6)return say(Math.floor(n/1000))+' thousand'+(n%1000?' '+say(n%1000):'');if(n<1e9)return say(Math.floor(n/1e6))+' million'+(n%1e6?' '+say(n%1e6):'');return String(n);}
-  const r=Math.floor(Number(value)||0),h=Math.round(((Number(value)||0)-r)*100);return say(r)+' Saudi riyals'+(h?' and '+say(h)+' halalas':'')+' only';
+  const r=Math.floor(Number(value)||0),h=Math.round(((Number(value)||0)-r)*100);return (say(r)+' Saudi riyals'+(h?' and '+say(h)+' halalas':'')+' only').replace(/\b[a-z]/g, c => c.toUpperCase());
 };
 
 function makePdf(jpegs){
@@ -130,8 +130,8 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
     if(qr){ctx.fillStyle='#fff';ctx.fillRect(margin+3,y+14,245,245);ctx.drawImage(qr,margin+3,y+14,245,245);}
     else {rect(margin+2,y+16,245,225,'#fff8f5','#e4bcad');wrapText('QR unavailable. Enter a genuine registered seller VAT number (15 digits, starting and ending with 3).',margin+16,y+58,220,17,true,COLORS.warn,23,7)}
   }
-  const sx2=755,sw=right-sx2;let sy=sumY;
-  function amountLine(t,val,em=false){if(em)rect(sx2-12,sy-27,sw+12,39,'#e8eaef',null);label(t,sx2,sy,18,em);label(SAR(val),right-6,sy,18,true,COLORS.ink,'right');sy+=38;line(sx2-10,sy-10,right)}
+  const sx2=385,sw=right-sx2;let sy=sumY;
+  function amountLine(t,val,em=false){if(em)rect(sx2-12,sy-27,sw+12,39,'#e8eaef',null);label(t,sx2,sy,17,em);label(SAR(val),right-6,sy,17,true,COLORS.ink,'right');sy+=38;line(sx2-10,sy-10,right)}
   amountLine('Subtotal / الإجمالي الفرعي',doc.subtotal??subtotal);
   amountLine('VAT 15% / ضريبة القيمة المضافة',vat);
   for(const a of adjustments.slice(0,5))amountLine(a.type||'Adjustment',a.signed);
@@ -139,7 +139,7 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   y=Math.max(sy+35,invoice?sumY+355:sumY+50);
   if(y+110>1620){nextPage();y=170;}
   line(margin,y,right);y+=38;label('AMOUNT IN WORDS  /  المبلغ كتابة',margin,y,17,true,COLORS.gray);y+=33;
-  y=wrapText(moneyWords(total),margin,y,right-margin,18,false,COLORS.ink,25,2)+16;
+  y=wrapText(moneyWords(total),margin,y,right-margin,18,false,COLORS.ink,26,4)+16;
   if(doc.notes){if(y+110>1620){nextPage();y=170;}line(margin,y,right);y+=34;label('NOTES  /  ملاحظات',margin,y,17,true);y+=32;y=wrapText(doc.notes,margin,y,right-margin,18,false,COLORS.ink,26,6)}
   capture();
   const base=clean(doc.reference||'DRAFT-'+(doc.date||'document')).replace(/[^a-z0-9_-]/gi,'_').slice(0,70);

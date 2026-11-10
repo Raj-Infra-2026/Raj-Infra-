@@ -313,7 +313,7 @@ export function CompanySettingsPage({ request, onChanged }) {
     );
 }
 
-const emptyLine = () => ({ description: '', quantity: 1, unit_price: 0, unit: 'PCS', remarks: '' });
+const emptyLine = () => ({ description: '', quantity: 1, unit_price: '', unit: 'PCS', remarks: '' });
 
 export function DocumentModal({ kind, editing, clients, role, request, onSaved, close, ClientForm }) {
     const invoice = ['Invoices', 'ProformaInvoices'].includes(kind); 
@@ -327,7 +327,8 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
         notes: editing?.notes || '', 
         date: editing?.date || saudiToday(), 
         invoice_time: editing?.invoice_time || editing?.invoice_timestamp?.slice(11,16) || saudiTime(), 
-        status: editing?.status || 'Active', 
+        status: editing?.status || 'Active',
+        paid_amount: editing?.paid_amount ?? '', 
         seller_name: editing?.seller_name || '', 
         seller_address: editing?.seller_address || '', 
         seller_vat: editing?.seller_vat || '', 
@@ -419,7 +420,10 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
     const setLine = (i, k, v) => setForm(f => ({ ...f, items: f.items.map((x, j) => j === i ? { ...x, [k]: v } : x) }));
     const chooseClient = id => { const c = clientList.find(x => x.id === id); setForm(f => ({ ...f, client_id: id, name: c?.name || '', buyer_name: c?.name || '', buyer_address: c?.address || '', buyer_vat: c?.vat_number || '', receiver_name: c?.name || '', receiver_address: c?.address || '', receiver_vat: c?.vat_number || '' })); };
     const totals = useMemo(() => invoiceTotals(form.items, form.adjustments), [form.items, form.adjustments]);
-    const previewRecord = () => ({ ...form, company_logo: form.company_logo || company?.logo_data || '', po_number: form.reference_number || form.po_number || '', reference: form.reference || '', buyer_name: form.buyer_name || form.name, buyer_address: form.buyer_address || clientList.find(x => x.id === form.client_id)?.address || '', buyer_vat: form.buyer_vat || clientList.find(x => x.id === form.client_id)?.vat_number || '', receiver_address: form.receiver_address || clientList.find(x => x.id === form.client_id)?.address || '', receiver_vat: form.receiver_vat || clientList.find(x => x.id === form.client_id)?.vat_number || '', subtotal: totals.subtotal, vat_amount: totals.vat, amount: totals.total });
+    const paymentNote = form.status === 'Partially Paid' ? `Amount paid: ${sar(Number(form.paid_amount || 0))}. Pending balance: ${sar(Math.max(0, num(totals.total - Number(form.paid_amount || 0))))}.` : '';
+    const userNotes = (form.notes || '').replace(/(?:\n|^)(?:Amount paid: SAR [\d,.]+\. Pending balance: SAR [\d,.]+\.)/g, '').trim();
+    const finalNotes = [userNotes, paymentNote].filter(Boolean).join('\n');
+    const previewRecord = () => ({ ...form, notes: finalNotes, company_logo: form.company_logo || company?.logo_data || '', po_number: form.reference_number || form.po_number || '', reference: form.reference || '', buyer_name: form.buyer_name || form.name, buyer_address: form.buyer_address || clientList.find(x => x.id === form.client_id)?.address || '', buyer_vat: form.buyer_vat || clientList.find(x => x.id === form.client_id)?.vat_number || '', receiver_address: form.receiver_address || clientList.find(x => x.id === form.client_id)?.address || '', receiver_vat: form.receiver_vat || clientList.find(x => x.id === form.client_id)?.vat_number || '', subtotal: totals.subtotal, vat_amount: totals.vat, amount: totals.total });
 
     async function persist() { 
         setError(''); 
@@ -432,12 +436,14 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
             setError('Select a valid invoice date and time (Saudi Arabia).');
             return;
         } 
+        if (invoice && form.status === 'Partially Paid' && (form.paid_amount === '' || !Number.isFinite(Number(form.paid_amount)) || Number(form.paid_amount) <= 0 || Number(form.paid_amount) >= totals.total)) { setError('Enter a paid amount greater than zero and less than the invoice total.'); return; }
+        if (invoice && form.items.some(x => String(x.unit_price).trim() === '')) { setError('Enter a rate for every invoice item.'); return; }
         if (invoice && !String(form.seller_name||'').trim()) { setError('Enter the seller company name'); return; } 
         
         setBusy(true); 
         try {
             const payload = editing 
-                ? { notes: form.notes, items: form.items, status: form.status, ...(kind === 'DeliveryNotes' ? { delivery_instructions: form.delivery_instructions } : {}) } 
+                ? { notes: userNotes, paid_amount: form.paid_amount, items: form.items, status: form.status, ...(kind === 'DeliveryNotes' ? { delivery_instructions: form.delivery_instructions } : {}) } 
                 : { ...previewRecord() };
             const path = '/records/' + kind + (editing ? '/' + encodeURIComponent(editing.id) : '');
             const d = await request(path, { method: editing ? 'PATCH' : 'POST', body: JSON.stringify(payload) });
@@ -516,6 +522,7 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
                                 ))}
                             </select>
                         </label>
+                        {invoice && form.status === 'Partially Paid' && <label>Amount Paid (SAR)<input type="number" min="0.01" step="0.01" required value={form.paid_amount} onChange={e => set('paid_amount', e.target.value)} placeholder="Enter amount paid"/><small>Pending balance: {sar(Math.max(0, num(totals.total - Number(form.paid_amount || 0))))}</small></label>}
                     </div>
                 </div>
 
