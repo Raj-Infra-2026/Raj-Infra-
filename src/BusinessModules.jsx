@@ -443,7 +443,7 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
             const d = await request(path, { method: editing ? 'PATCH' : 'POST', body: JSON.stringify(payload) });
             
             try { 
-                await downloadDocumentPdf({ ...d.record, company_logo: d.record.company_logo || company?.logo_data || '' }, kind, kind === 'Invoices' ? invoiceQrMarkup(d.record) : ''); 
+                await downloadDocumentPdf({ ...d.record, company_logo: d.record.company_logo || company?.logo_data || '' }, kind, kind === 'Invoices' ? invoiceQrMarkup(d.record) : '', 'submitted'); 
             } catch(downloadError) { 
                 window.alert('Record submitted, but PDF download failed: ' + downloadError.message); 
                 await onSaved(); 

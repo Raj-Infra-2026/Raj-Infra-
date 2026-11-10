@@ -41,11 +41,11 @@ async function loadImage(src){
   return img;
 }
 
-export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup=''){
+export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode='preview'){
   const invoice=kind==='Invoices',proforma=kind==='ProformaInvoices';
   const title=invoice?'TAX INVOICE':proforma?'PROFORMA INVOICE':kind==='DeliveryNotes'?'DELIVERY NOTE':kind==='Quotations'?'QUOTATION':kind==='ClientPOs'?'CLIENT PURCHASE ORDER':'PURCHASE ORDER';
   const arabic=invoice?'فاتورة ضريبية':proforma?'فاتورة أولية':kind==='DeliveryNotes'?'إشعار تسليم':kind==='Quotations'?'عرض سعر':'';
-  const draft=invoice && !(doc.zatca_clearance_id && doc.signed_xml && doc.issued_at);
+  const draft=invoice && mode === 'preview';
   const items=Array.isArray(doc.items)?doc.items:[];
   const subtotal=round(items.reduce((n,x)=>n+Number(x.quantity||0)*Number(x.unit_price||0),0));
   const vat=round(doc.vat_amount??subtotal*.15), adjustments=(doc.adjustments||[]).map(a=>({...a, signed:['Deduction','Retention'].includes(a.type)?-Math.abs(Number(a.amount||0)):Number(a.amount||0)}));
@@ -145,15 +145,15 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup=''){
   const base=clean(doc.reference||'DRAFT-'+(doc.date||'document')).replace(/[^a-z0-9_-]/gi,'_').slice(0,70);
   return new File([makePdf(jpegPages)],(draft?'PREVIEW_':'')+base+'.pdf',{type:'application/pdf'});
 }
-export async function downloadDocumentPdf(doc,kind='Invoices',qrMarkup=''){
-  const file=await createDocumentPdfFile(doc,kind,qrMarkup);
+export async function downloadDocumentPdf(doc,kind='Invoices',qrMarkup='',mode='preview'){
+  const file=await createDocumentPdfFile(doc,kind,qrMarkup,mode);
   const url=URL.createObjectURL(file),link=document.createElement('a');link.href=url;link.download=file.name;
   document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);return file.name;
 }
 export async function previewDocumentPdf(doc,kind='Invoices',qrMarkup=''){
   const popup=window.open('','_blank');if(!popup)throw Error('Allow pop-ups to preview the PDF.');
   try{popup.document.write('<title>Preparing invoice preview</title><body style="font:16px Arial;padding:30px">Preparing document preview...</body>');
-    const file=await createDocumentPdfFile(doc,kind,qrMarkup),url=URL.createObjectURL(file);
+    const file=await createDocumentPdfFile(doc,kind,qrMarkup,'preview'),url=URL.createObjectURL(file);
     popup.location.replace(url);setTimeout(()=>URL.revokeObjectURL(url),5*60*1000);
   }catch(error){popup.close();window.alert('PDF preview failed: '+error.message);throw error}
 }
