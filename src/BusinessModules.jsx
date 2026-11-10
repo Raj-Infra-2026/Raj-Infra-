@@ -103,18 +103,24 @@ catch {
 // A preview QR is a readable TLV *demonstration* using the actual preview generation time.
 // It never claims that the selected document date was the issuance timestamp.
 // Cryptographic tags 6–9 belong to the validated, signed production workflow only.
+// Classic five-field ZATCA TLV demo QR, matching the earlier readable format.
+// No cryptographic or Phase 2 approval claims. Use the actual preview time,
+// never a backdated invoice date as an issuance timestamp.
 export function previewInvoiceQrPayload(doc, now = new Date()) {
     if (!doc?.seller_name || !/^3\d{13}3$/.test(String(doc.seller_vat || ''))) return '';
     const items = Array.isArray(doc.items) ? doc.items : [];
     const totals = invoiceTotals(items, doc.adjustments || []);
     const timestamp = now.toISOString().replace(/\.\d{3}Z$/, 'Z');
-    const fields = [String(doc.seller_name), String(doc.seller_vat), timestamp,
-      num(doc.amount ?? totals.total).toFixed(2), num(doc.vat_amount ?? totals.vat).toFixed(2)];
+    const total = Number(doc.amount ?? totals.total);
+    const vat = Number(doc.vat_amount ?? totals.vat);
+    if (!Number.isFinite(total) || !Number.isFinite(vat) || total < 0 || vat < 0) return '';
+    const values = [String(doc.seller_name).trim(), String(doc.seller_vat), timestamp,
+        total.toFixed(2), vat.toFixed(2)];
     const encoder = new TextEncoder(), bytes = [];
-    for (let i=0; i<fields.length; i++) {
-      const encoded = encoder.encode(fields[i]);
-      if (encoded.length > 255) throw Error('Invoice preview QR field too long');
-      bytes.push(i+1, encoded.length, ...encoded);
+    for (let i = 0; i < values.length; i++) {
+        const encoded = encoder.encode(values[i]);
+        if (encoded.length > 255) throw Error('Invoice QR TLV field exceeds 255 bytes');
+        bytes.push(i + 1, encoded.length, ...encoded);
     }
     return btoa(String.fromCharCode(...bytes));
 }
