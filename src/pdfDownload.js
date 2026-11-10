@@ -6,6 +6,18 @@ const pdfDate = value => { const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(value|
 const SAR = n=>'SAR '+Number(n||0).toLocaleString('en-SA',{minimumFractionDigits:2,maximumFractionDigits:2});
 const round = n=>Math.round((Number(n)||0)*100)/100;
 const clean = v=>String(v??'').trim();
+// Avoid repeating automatically generated payment summaries when a saved invoice
+// already includes one and the UI appends the latest summary again.
+const uniqueNotes = value => {
+  const raw=clean(value);
+  if(!raw)return '';
+  const payment=/Amount paid:\s*SAR\s*[\d,]+(?:\.\d{2})?\.\s*Pending balance:\s*SAR\s*[\d,]+(?:\.\d{2})?\./gi;
+  const matches=[...raw.matchAll(payment)];
+  if(!matches.length)return raw;
+  const latest=matches[matches.length-1][0].trim();
+  const other=raw.replace(payment,'').split('\n').map(t=>t.trim()).filter(Boolean).join('\n');
+  return [other,latest].filter(Boolean).join('\n');
+};
 const moneyWords = value => {
   const ones=['zero','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen'];
   const tens=['','','twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety'];
@@ -131,16 +143,20 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
     else {rect(margin+2,y+16,245,225,'#fff8f5','#e4bcad');wrapText('QR unavailable. Enter a genuine registered seller VAT number (15 digits, starting and ending with 3).',margin+16,y+58,220,17,true,COLORS.warn,23,7)}
   }
   const sx2=385,sw=right-sx2;let sy=sumY;
-  function amountLine(t,val,em=false){if(em)rect(sx2-12,sy-27,sw+12,39,'#e8eaef',null);label(t,sx2,sy,17,em);label(SAR(val),right-6,sy,17,true,COLORS.ink,'right');sy+=38;line(sx2-10,sy-10,right)}
+  function amountLine(t,val,em=false){if(em)rect(sx2-12,sy-27,sw+12,39,'#e8eaef',null);label(t,sx2,sy,17,em);label(SAR(val),right-6,sy,17,true,COLORS.ink,'right');sy+=38;}
   amountLine('Subtotal / الإجمالي الفرعي',doc.subtotal??subtotal);
   amountLine('VAT 15% / ضريبة القيمة المضافة',vat);
   for(const a of adjustments.slice(0,5))amountLine(a.type||'Adjustment',a.signed);
   amountLine('GRAND TOTAL / الإجمالي',total,true);
-  y=Math.max(sy+35,invoice?sumY+355:sumY+50);
+  // One separator below the entire totals block, never through the bilingual labels.
+  line(sx2-10,sy-9,right);
+  // Keep the QR clear while removing the large unused gap below it.
+  y=Math.max(sy+35,invoice?sumY+290:sumY+50);
   if(y+110>1620){nextPage();y=170;}
   line(margin,y,right);y+=38;label('AMOUNT IN WORDS  /  المبلغ كتابة',margin,y,17,true,COLORS.gray);y+=33;
   y=wrapText(moneyWords(total),margin,y,right-margin,18,false,COLORS.ink,26,4)+16;
-  if(doc.notes){if(y+110>1620){nextPage();y=170;}line(margin,y,right);y+=34;label('NOTES  /  ملاحظات',margin,y,17,true);y+=32;y=wrapText(doc.notes,margin,y,right-margin,18,false,COLORS.ink,26,6)}
+  const notes=uniqueNotes(doc.notes);
+  if(notes){if(y+110>1620){nextPage();y=170;}line(margin,y,right);y+=34;label('NOTES  /  ملاحظات',margin,y,17,true);y+=32;y=wrapText(notes,margin,y,right-margin,18,false,COLORS.ink,26,6)}
   capture();
   const base=clean(doc.reference||'DRAFT-'+(doc.date||'document')).replace(/[^a-z0-9_-]/gi,'_').slice(0,70);
   return new File([makePdf(jpegPages)],(draft?'PREVIEW_':'')+base+'.pdf',{type:'application/pdf'});
