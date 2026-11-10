@@ -1,3 +1,4 @@
+import { matchesSearch } from './searchUtils.js';
 import { downloadDocumentPdf, previewDocumentPdf } from './pdfDownload.js';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, Search, X, Save, Eye, Trash2, Download, FileText } from 'lucide-react';
@@ -372,6 +373,7 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
     const [company, setCompany] = useState(null);
     const [showCompanySettings, setShowCompanySettings] = useState(false);
     const [companySaving, setCompanySaving] = useState(false);
+    const [clientSearch, setClientSearch] = useState('');
     const [clientList, setClientList] = useState(clients);
     const [clientPopup, setClientPopup] = useState(false);
     const [busy, setBusy] = useState(false);
@@ -504,10 +506,13 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
                         <h3>Client / Receiver</h3>
                         <button type="button" className="secondary" onClick={() => setClientPopup(true)}><Plus size={16}/> Create New Client</button>
                     </div>
+                    <label>Search Clients / البحث عن العملاء
+                        <input type="search" dir="auto" value={clientSearch} onChange={e => setClientSearch(e.target.value)} placeholder="Search Arabic, English, or any language" />
+                    </label>
                     <label>Select Existing Client
                         <select required value={form.client_id} onChange={e => chooseClient(e.target.value)}>
                             <option value="">Select a client</option>
-                            {clientList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            {clientList.filter(c => c.id === form.client_id || matchesSearch([c.name,c.name_ar,c.name_en,c.email,c.phone,c.vat_number,c.address].join(' '),clientSearch)).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                         </select>
                     </label>
                     {form.client_id && <p className="field-hint">{clientList.find(x => x.id === form.client_id)?.address || 'No address saved'} · VAT: {clientList.find(x => x.id === form.client_id)?.vat_number || 'Not supplied'}</p>}

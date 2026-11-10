@@ -1,3 +1,18 @@
+// Unicode-aware matching: Arabic diacritics, tatweel, common letter forms,
+// whitespace and Latin accents are normalized only for comparison, never storage.
+function normalizeSearch(value) {
+  return String(value ?? '').normalize('NFKC').toLocaleLowerCase()
+    .replace(/[\u064b-\u065f\u0670\u06d6-\u06ed\u0640]/g, '')
+    .replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ؤ/g, 'و').replace(/ئ/g, 'ي')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/gu, ' ').trim();
+}
+function matchesSearch(value, query) {
+  const tokens = normalizeSearch(query).split(' ').filter(Boolean);
+  const haystack = normalizeSearch(value);
+  return tokens.every(token => haystack.includes(token));
+}
+
 /* ALIF LABS multi-company API. Credentials are server-side only.
    Public registration uses a master spreadsheet; each authenticated tenant gets its own sheet. */
 const TABLES = ['Clients', 'Quotations', 'ProformaInvoices', 'Invoices', 'DeliveryNotes', 'ClientPOs', 'Vendors', 'PurchaseOrders'];
@@ -526,14 +541,14 @@ export default { async fetch(req, env) {
                 return reply({ counts, recent, notifications: pending.map(r => ({ id: r.id, title: r.reference || r.name, message: (r.status||'Active') + ' · ' + r.name, table: r.notification_table })), totals: { amount: docs.filter(r => DOCS.some(t => all[TABLES.indexOf(t)].some(x => x.id === r.id))).reduce((s, r) => s + Number(r.amount || 0), 0), pending: pending.length, unpaid: docs.filter(r => /unpaid|overdue|partially paid/i.test(r.status)).length } }, 200, origin);
             }
             if (url.pathname === '/api/search' && req.method === 'GET') {
-                const q = (url.searchParams.get('q') || '').trim().toLowerCase();
-                if (q.length < 2)
+                const q = (url.searchParams.get('q') || '').trim();
+                if (!q)
                     return reply({ results: [] }, 200, origin);
                 const data = await Promise.all(TABLES.map(t => records(env, t)));
                 const results = [];
                 for (let i = 0; i < TABLES.length; i++)
                     for (const r of data[i])
-                        if (visible(user, r) && [r.name, r.reference, r.status].some(x => String(x || '').toLowerCase().includes(q))) {
+                        if (visible(user, r) && matchesSearch([r.name, r.reference, r.status, r.po_number, r.vat_number, r.cr_number, r.phone, r.email, r.address, r.description, r.notes].join(' '), q)) {
                             results.push({ id: r.id, table: TABLES[i], name: r.name, reference: r.reference });
                             if (results.length >= 40)
                                 break;
@@ -558,8 +573,8 @@ export default { async fetch(req, env) {
                 return reply({ error: 'Permission denied' }, 403, origin);
             if (req.method === 'GET') {
                 const data = await records(env, table);
-                const q = (url.searchParams.get('q') || '').toLowerCase();
-                return reply({ records: data.filter(r => visible(user, r) && (!q || JSON.stringify(r).toLowerCase().includes(q))).slice(0, 1000).map(({ row, brand_id, ...r }) => r) }, 200, origin);
+                const q = (url.searchParams.get('q') || '');
+                return reply({ records: data.filter(r => visible(user, r) && (!q || matchesSearch(JSON.stringify(r), q))).slice(0, 1000).map(({ row, brand_id, ...r }) => r) }, 200, origin);
             }
             if (req.method === 'POST' && !id) {
                 const b = await req.json();
