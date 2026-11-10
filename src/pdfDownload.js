@@ -94,10 +94,10 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup=''){
   if(doc.seller_email)label(doc.seller_email,sx,290,16,false,COLORS.gray);
   label(title,right,177,38,true,COLORS.ink,'right');
   if(arabic)label(arabic,right,221,25,true,COLORS.ink,'right',true);
-  label(clean(doc.reference)||'DRAFT — NUMBER PENDING',right,258,17,true,COLORS.gray,'right');
+  label(clean(doc.reference)||(proforma?'NUMBER ASSIGNED ON SUBMIT':'DRAFT — NUMBER PENDING'),right,258,17,true,COLORS.gray,'right');
   if(draft){rect(margin,315,W-2*margin,52,'#fff2ec','#d9a496');label('DRAFT / DEMO — NOT ISSUED · NOT CLEARED OR REPORTED TO ZATCA',margin+16,348,19,true,COLORS.warn);}
   const detailsY=draft?390:328;const metaW=(W-2*margin-18)/3;
-  const details=[['INVOICE DATE  /  تاريخ الفاتورة',pdfDate(doc.date)],['REFERENCE  /  رقم المرجع',doc.po_number||doc.reference_number||'—'],['DOCUMENT NUMBER  /  رقم الفاتورة',doc.reference||'Pending draft']];
+  const details=[['INVOICE DATE  /  تاريخ الفاتورة',pdfDate(doc.date)],['REFERENCE  /  رقم المرجع',doc.po_number||doc.reference_number||'—'],['DOCUMENT NUMBER  /  رقم الفاتورة',doc.reference||(proforma?'Assigned on submit':'Pending draft')]];
   details.forEach(([heading,value],i)=>{const x=margin+i*(metaW+9);rect(x,detailsY,metaW,105);label(heading,x+12,detailsY+28,15,true,COLORS.gray);wrapText(value,x+12,detailsY+66,metaW-28,20,true,COLORS.ink,24,2)});
   const boxY=detailsY+128,boxW=(W-2*margin-14)/2,boxH=163;
   function entityBox(x,heading,name,address,vat,phone){rect(x,boxY,boxW,boxH,'#fff');rect(x+8,boxY+8,boxW-16,34,COLORS.light,null);label(heading,x+18,boxY+32,17,true);label(name||'—',x+18,boxY+66,21,true);wrapText(address||'—',x+18,boxY+92,boxW-36,16,false,COLORS.gray,21,2);if(vat)label('VAT: '+vat,x+18,boxY+148,15,false,COLORS.gray);else if(phone)label('Phone: '+phone,x+18,boxY+148,15,false,COLORS.gray)}
