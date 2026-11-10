@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import { buildCryptoTrialQr } from '../src/zatcaCryptoTrial.js';
+import { decodeQrTlv } from '../worker/zatca/qr-phase2.mjs';
+const doc={date:'2026-11-10',seller_name:'ALIF LABS TEST',seller_vat:'300000000000003',buyer_name:'Demo buyer',buyer_vat:'300000000000003',reference:'DRAFT-TEST',items:[{description:'Demo service',quantity:1,unit_price:100}],adjustments:[],amount:115,vat_amount:15};
+const result=await buildCryptoTrialQr(doc,'standard');
+const fields=decodeQrTlv(result.qr);
+assert.deepEqual(Object.keys(fields).map(Number),[1,2,3,4,5,6,7,8]);
+assert.equal(fields[6].length,32);assert.equal(fields[7].length,64);assert.equal(fields[8].length,65);
+assert.equal(result.report.localSignatureVerified,true);
+console.log('PASS: invoice-specific demo QR TLV tags 1-8 and locally verified ephemeral ECDSA signature');
