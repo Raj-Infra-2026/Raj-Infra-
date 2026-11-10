@@ -21,6 +21,7 @@ async function verify(t, secret) { try {
     return p.exp > Date.now() ? p : null;
 }
    
+   
 catch {
     return null;
 } }
