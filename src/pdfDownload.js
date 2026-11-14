@@ -44,7 +44,7 @@ function makePdf(jpegs){
   push(`trailer\n<< /Size ${3+jpegs.length*3} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`);
   return new Blob(parts,{type:'application/pdf'});
 }
-const COLORS={ink:'#202531',gray:'#606875',muted:'#7c8491',rule:'#d8dce5',light:'#f4f5f8',brand:'#202531',warn:'#8a3b28'};
+const COLORS={ink:'#171717',gray:'#555555',muted:'#777777',rule:'#d9d9d9',light:'#f5f5f5',brand:'#3763a3',warn:'#8a3b28'};
 const W=1240,H=1754,margin=64,right=W-margin;
 async function loadImage(src){
   if(!src)return null;
@@ -87,28 +87,30 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   function line(x,yy,end){ctx.strokeStyle=COLORS.rule;ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(x,yy);ctx.lineTo(end,yy);ctx.stroke()}
   function basePage(){
     const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;ctx=canvas.getContext('2d',{alpha:false});ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);
-    page++;ctx.fillStyle=COLORS.brand;ctx.fillRect(margin,57,5,50);
-    ctx.fillStyle=COLORS.light;ctx.fillRect(margin,H-96,W-margin*2,37);
-    label(`${title}  ·  ${doc.reference||'Number assigned on submission'}`,margin+12,H-72,16,true,COLORS.gray);
-    label(`Page ${page}`,right-12,H-72,16,false,COLORS.gray,'right');
+    page++;ctx.fillStyle='#c92828';ctx.fillRect(margin,H-118,W-margin*2,3);
+    label(doc.seller_address||'',W/2,H-91,15,false,COLORS.gray,'center');
+    label([doc.seller_email,doc.seller_website].filter(Boolean).join('  |  '),W/2,H-64,15,false,COLORS.gray,'center');
+    label(`Page ${page}`,right,H-38,13,false,COLORS.gray,'right');
     y=140;
     return canvas;
   }
   let canvas=basePage();
   function capture(){const jpg=canvas.toDataURL('image/jpeg',0.97).split(',')[1],bin=atob(jpg),bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);jpegPages.push(bytes)}
   function nextPage(){capture();canvas=basePage();return canvas}
-  // Header: company identity on the left; bilingual invoice title at right.
-  let sx=margin;if(logo){const scale=Math.min(160/logo.width,115/logo.height);ctx.drawImage(logo,margin,140,logo.width*scale,logo.height*scale);sx=margin+185;}
-  label(doc.seller_name||doc.sender_name||'Company name',sx,160,27,true);
-  wrapText(doc.seller_address||doc.sender_address||'',sx,189,550-(sx-margin),16,false,COLORS.gray,22,2);
-  if(doc.seller_cr)label('CR  '+doc.seller_cr,sx,238,17,false,COLORS.gray);
-  if(doc.seller_vat)label('VAT  '+doc.seller_vat,sx,264,17,false,COLORS.gray);
-  if(doc.seller_email)label(doc.seller_email,sx,290,16,false,COLORS.gray);
-  label(title,right,177,38,true,COLORS.ink,'right');
-  if(arabic)label(arabic,right,221,25,true,COLORS.ink,'right',true);
-  label(clean(doc.reference)||'Number assigned on submission',right,258,17,true,COLORS.gray,'right');
-  if(draft){ctx.save();ctx.strokeStyle='#c52222';ctx.lineWidth=5;ctx.strokeRect(right-225,280,190,57);label('PREVIEW',right-208,319,31,true,'#c52222');ctx.restore();}
-  const detailsY=draft?390:328;const metaW=(W-2*margin-18)/3;
+  // Reference design: bilingual left/right identity, central logo, centered title.
+  const leftWidth=380;
+  label(doc.seller_name||doc.sender_name||'Company name',margin,155,22,true);
+  if(doc.seller_cr)label('C.R.: '+doc.seller_cr,margin,192,17,false,COLORS.gray);
+  if(doc.seller_vat)label('VAT: '+doc.seller_vat,margin,220,17,false,COLORS.gray);
+  if(logo){const scale=Math.min(205/logo.width,125/logo.height);const lw=logo.width*scale,lh=logo.height*scale;ctx.drawImage(logo,(W-lw)/2,114,lw,lh);}
+  const companyArabic=clean(doc.seller_name_ar||doc.company_name_ar||'');
+  if(companyArabic)label(companyArabic,right,155,22,true,COLORS.ink,'right',true);
+  if(doc.seller_cr)label('س.ت.: '+doc.seller_cr,right,192,16,false,COLORS.gray,'right',true);
+  if(doc.seller_vat)label('الرقم الضريبي: '+doc.seller_vat,right,220,16,false,COLORS.gray,'right',true);
+  const heading=invoice?'Tax Invoice - فاتورة ضريبية':proforma?'Proforma Invoice - الفاتورة الأولية':title+(arabic?' - '+arabic:'');
+  label(heading,W/2,299,39,true,COLORS.ink,'center');
+  if(draft){ctx.save();ctx.strokeStyle='#c52222';ctx.lineWidth=4;ctx.strokeRect(right-185,320,173,49);label('PREVIEW',right-173,353,27,true,'#c52222');ctx.restore();}
+  const detailsY=draft?390:342;const metaW=(W-2*margin-18)/3;
   const details=[['INVOICE DATE  /  تاريخ الفاتورة',pdfDate(doc.date)],['PO NUMBER  /  رقم أمر الشراء',doc.po_number||doc.reference_number||'—'],['DOCUMENT NUMBER  /  رقم الفاتورة',doc.reference||'Pending draft']];
   details.forEach(([heading,value],i)=>{const x=margin+i*(metaW+9);rect(x,detailsY,metaW,105);label(heading,x+12,detailsY+28,15,true,COLORS.gray);wrapText(value,x+12,detailsY+66,metaW-28,20,true,COLORS.ink,24,2)});
   const boxY=detailsY+128,boxW=(W-2*margin-14)/2,boxH=163;
@@ -119,8 +121,8 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   if(invoice && doc.invoice_time)label('Document time (Saudi Arabia): '+doc.invoice_time,margin,y,17,false,COLORS.gray);
   y+=34;
   function tableHeader(){
-    rect(margin,y,W-2*margin,46,COLORS.light);label('#',margin+14,y+29,18,true);label('DESCRIPTION  /  الوصف',margin+60,y+29,18,true);
-    label('QTY',835,y+29,18,true,COLORS.ink,'right');label('RATE (SAR)',975,y+29,18,true,COLORS.ink,'right');label('TOTAL (SAR)',right-13,y+29,18,true,COLORS.ink,'right');y+=46;
+    rect(margin,y,W-2*margin,62,COLORS.brand,null);label('#',margin+14,y+35,18,true,'#fff');label('ITEM / وصف الصنف',margin+60,y+35,18,true,'#fff');
+    label('QTY / الكمية',835,y+35,16,true,'#fff','right');label('UNIT PRICE',975,y+35,16,true,'#fff','right');label('TOTAL INCL. VAT',right-13,y+35,16,true,'#fff','right');y+=62;
   }
   tableHeader();
   items.forEach((item,i)=>{
@@ -132,7 +134,7 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
     label(String(i+1),margin+16,y+34,19);lines.slice(0,8).forEach((t,k)=>label(t,margin+60,y+34+26*k,19));
     label(String(item.quantity||0),835,y+34,18,false,COLORS.ink,'right');
     label(Number(item.unit_price||0).toFixed(2),975,y+34,18,false,COLORS.ink,'right');
-    label(round(Number(item.quantity||0)*Number(item.unit_price||0)).toFixed(2),right-13,y+34,18,true,COLORS.ink,'right');y+=rowHeight;
+    label(SAR(round(Number(item.quantity||0)*Number(item.unit_price||0)*1.15)),right-13,y+34,18,true,COLORS.ink,'right');y+=rowHeight;
   });
   if(y+420>1620){nextPage();y=170;label(title+' — totals',margin,y,26,true);y+=44}
   y+=28;const sumY=y;
@@ -143,18 +145,21 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
     else {rect(margin+2,y+16,245,225,'#fff8f5','#e4bcad');wrapText('QR unavailable. Enter a genuine registered seller VAT number (15 digits, starting and ending with 3).',margin+16,y+58,220,17,true,COLORS.warn,23,7)}
   }
   const sx2=385,sw=right-sx2;let sy=sumY;
-  function amountLine(t,val,em=false){if(em)rect(sx2-12,sy-27,sw+12,39,'#e8eaef',null);label(t,sx2,sy,17,em);label(SAR(val),right-6,sy,17,true,COLORS.ink,'right');sy+=38;}
+  function amountLine(t,val,em=false){if(em)rect(sx2-12,sy-28,sw+12,43,COLORS.brand,null);label(t,sx2,sy,17,em,em?'#fff':COLORS.ink);label(SAR(val),right-6,sy,18,true,em?'#fff':COLORS.ink,'right');sy+=43;}
   amountLine('Subtotal / الإجمالي الفرعي',doc.subtotal??subtotal);
   amountLine('VAT 15% / ضريبة القيمة المضافة',vat);
   for(const a of adjustments.slice(0,5))amountLine(a.type||'Adjustment',a.signed);
   amountLine('GRAND TOTAL / الإجمالي',total,true);
   // One separator below the entire totals block, never through the bilingual labels.
-  line(sx2-10,sy-9,right);
+  // Totals highlight intentionally has no line cutting through its labels.
   // Keep the QR clear while removing the large unused gap below it.
-  y=Math.max(sy+35,invoice?sumY+290:sumY+50);
+  y=Math.max(sy+32,invoice?sumY+280:sumY+48);
   if(y+110>1620){nextPage();y=170;}
   line(margin,y,right);y+=38;label('AMOUNT IN WORDS  /  المبلغ كتابة',margin,y,17,true,COLORS.gray);y+=33;
   y=wrapText(moneyWords(total),margin,y,right-margin,18,false,COLORS.ink,26,4)+16;
+  // Optional customer-provided banking details, never invented.
+  const bankLines=[['Bank Name',doc.bank_name],['A/c Name',doc.bank_account_name],['Account No.',doc.bank_account_number],['IBAN',doc.iban||doc.bank_iban],['SWIFT',doc.swift||doc.bank_swift]].filter(x=>clean(x[1]));
+  if(bankLines.length){if(y+bankLines.length*27+70>1620){nextPage();y=170;}line(margin,y,right);y+=36;label('BANK DETAILS',margin,y,18,true);y+=28;for(const [k,v] of bankLines){label(k+': '+v,margin,y,16,false,COLORS.ink);y+=26;}y+=14;}
   const notes=uniqueNotes(doc.notes);
   if(notes){if(y+110>1620){nextPage();y=170;}line(margin,y,right);y+=34;label('NOTES  /  ملاحظات',margin,y,17,true);y+=32;y=wrapText(notes,margin,y,right-margin,18,false,COLORS.ink,26,6)}
   capture();
