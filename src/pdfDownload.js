@@ -151,17 +151,29 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   // Reference leaves several blank ruled item lines when space permits.
   const blankCount=Math.min(3,Math.max(0,Math.floor((920-y)/55)));
   for(let i=0;i<blankCount;i++){gridRow(y,55);y+=55}
-  rect(left,y,contentW,40,'#d9dce2',null);rightText('Total',col[5]-20,y+28,18,true);rightText(fmt(subtotal),col[5]-10,y+28,17,true);rightText(fmt(total),right-10,y+28,17,true);y+=70;
+  // Keep the Total label in its own cell, away from the numeric columns.
+  rect(left,y,contentW,40,'#d9dce2',null);rightText('Total',col[4]-12,y+28,18,true);rightText(fmt(subtotal),col[5]-10,y+28,17,true);rightText(fmt(total),right-10,y+28,17,true);y+=70;
   if(y+520>1600){nextPage();y=155}
   const totalsX=535,totalsValX=right-4;
-  const summary=(caption,val,yy,bold=false)=>{label(caption,totalsX,yy,17,bold);rightText('﷼ '+fmt(val),totalsValX,yy,18,bold)};
+  // Reserve an independent right-aligned amount column so long bilingual
+  // captions cannot run into SAR values. Shrink captions only when needed.
+  const amountColumnLeft=960;
+  const fittedLabel=(value,x,baseline,maxWidth,preferred=17,bold=false,color=COLORS.ink)=>{
+    let size=preferred;
+    while(size>12){ctx.font=font(size,bold);if(ctx.measureText(value).width<=maxWidth)break;size-=0.5;}
+    label(value,x,baseline,size,bold,color);
+  };
+  const summary=(caption,val,yy,bold=false)=>{
+    fittedLabel(caption,totalsX,yy,amountColumnLeft-totalsX-18,17,bold);
+    rightText('﷼ '+fmt(val),totalsValX,yy,18,bold);
+  };
   summary('Taxable Amount / المبلغ الخاضع للضريبة:',subtotal,y);
   summary('Total VAT (15%) / إجمالي الضريبة:',vat,y+38);
   summary('Total Including VAT / الإجمالي شامل الضريبة:',total,y+76);
   // Signature area intentionally blank: never fabricate a real signature or stamp.
   label('Authorized Signatory',left+30,y+64,18,true);
   rect(totalsX-5,y+103,right-totalsX+5,57,BLUE,null);
-  label('Invoice Total / إجمالي الفاتورة:',totalsX+8,y+140,21,true,'#fff');
+  fittedLabel('Invoice Total / إجمالي الفاتورة:',totalsX+8,y+140,amountColumnLeft-totalsX-22,21,true,'#fff');
   rightText('﷼ '+fmt(total),right-10,y+140,23,true,'#fff');
   rightText('('+moneyWords(total)+')',right,y+187,16,false,'#555');
   y+=228;
