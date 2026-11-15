@@ -413,99 +413,100 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
     else label(text,x,baseline,size,bold,color,'left',arabicText);
     ctx.restore();
   };
-  const TOTALS_BLOCK_HEIGHT=350;
-  const QR_ZONE_HEIGHT=255;
-  // Keep the complete totals and QR above the footer; move together if needed.
-  if(y+TOTALS_BLOCK_HEIGHT+(invoice?QR_ZONE_HEIGHT:0)>CONTENT_BOTTOM){nextPage();y=155;}
-  const totalsTop=y;
-  const summary=(english,arabicText,value,top)=>{
-    captionFit(english,totalCaptionX,top+25,captionWidth,17);
-    captionFit(arabicText,totalCaptionX,top+53,captionWidth,15,false,INK,true);
-    fittedAmount(value,right-12,top+42,right-AMOUNT_START-22,18);
-    line(totalsX,top+66,right);
-  };
-  summary('Taxable Amount','المبلغ الخاضع للضريبة',subtotal,totalsTop);
-  summary('Total VAT (15%)','إجمالي الضريبة',vat,totalsTop+69);
-  summary('Total Including VAT','الإجمالي شامل الضريبة',total,totalsTop+138);
-  label('Authorized Signatory',left+20,totalsTop+92,17,true);
-  const blueY=totalsTop+219;
-  rect(totalsX-6,blueY,right-totalsX+6,90,BLUE,null);
-  captionFit(proforma?'Proforma Total':'Invoice Total',totalCaptionX,blueY+36,captionWidth,19,true,'#fff');
-  captionFit(proforma?'الإجمالي المبدئي':'إجمالي الفاتورة',totalCaptionX,blueY+70,captionWidth,16,true,'#fff',true);
-  fittedAmount(total,right-13,blueY+57,right-AMOUNT_START-22,21,true,'#fff');
-  // Amount in words gets its own line BELOW the blue bar, never over the labels.
-  captionFit('('+moneyWords(total)+')',totalsX,blueY+126,right-totalsX,14,false,'#555');
-  y=totalsTop+TOTALS_BLOCK_HEIGHT;
-
-  // The QR header is deliberately two rows; English and Arabic never share space.
-  const lowerTop=y;
-  if(invoice){
-    const qx=right-205,qrSize=190;
-    captionFit('QR Code',qx,lowerTop+22,qrSize,14,true);
-    // Right aligned Arabic label, fitted inside the QR column.
-    const qrAr='رمز الاستجابة السريعة';
-    let qrArSize=13;
-    ctx.save();while(qrArSize>10){ctx.font=font(qrArSize,true,true);if(ctx.measureText(qrAr).width<=qrSize)break;qrArSize-=0.5;}ctx.restore();
-    arabicRight(qrAr,qx+qrSize,lowerTop+48,qrArSize,true);
-    if(qr){
-      ctx.fillStyle='#fff';ctx.fillRect(qx,lowerTop+60,qrSize,qrSize);
-      ctx.drawImage(qr,qx,lowerTop+60,qrSize,qrSize);
-    }else{
-      rect(qx,lowerTop+60,qrSize,qrSize,'#fff8f5','#e4bcad');
-      wrapText('QR unavailable',qx+12,lowerTop+99,qrSize-24,14,true,COLORS.warn);
-    }
-  }
-  // Optional bank details are per-document only, never prefilled or hardcoded.
-  // They appear below the QR and immediately above remarks, in both preview and final.
+  // Compact bilingual summary: 20% smaller labels, tighter paired rows.
+  const SUMMARY_ROW=53;
+  const SUMMARY_HEIGHT=SUMMARY_ROW*3;
+  const BLUE_HEIGHT=70;
+  const WORDS_HEIGHT=34;
+  const TOTALS_BLOCK_HEIGHT=SUMMARY_HEIGHT+BLUE_HEIGHT+WORDS_HEIGHT+14;
+  const QR_SIZE=190;
+  const QR_ZONE_HEIGHT=248;
   const bankLines=[
     ['Bank Name',doc.bank_name],['A/c Name',doc.bank_account_name],
     ['Account No.',doc.bank_account_number],['IBAN No.',doc.bank_iban],
     ['SWIFT No.',doc.bank_swift]
   ].filter(([,value])=>clean(value));
   const notes=uniqueNotes(doc.notes||doc.remarks||doc.remark);
-  const bottomLimit=H-244; // Keep content above the footer divider.
-  // Put short remarks beside the QR instead of unnecessarily pushing them below it.
-  // Longer remarks and bank details use the full-width area below the QR.
-  const notesBesideQr=invoice && !bankLines.length && notes.length>0 && notes.length<=180;
-  const notesX=left;
-  let notesWidth=notesBesideQr?(right-245-left):contentW;
-  let cursor=notesBesideQr?lowerTop+40:(invoice?lowerTop+270:lowerTop+16);
-  const ensureRoom=(height)=>{if(cursor+height>bottomLimit){nextPage();cursor=158;notesWidth=contentW;}};
+  const bottomLimit=H-244;
+  // A short invoice keeps the totals and lower section on the same page when possible.
+  // Long invoices paginate; never push the totals into the fixed footer.
+  if(y+TOTALS_BLOCK_HEIGHT+20>bottomLimit){nextPage();y=155;}
+  const totalsTop=y;
+  const summary=(english,arabicText,value,top)=>{
+    captionFit(english,totalCaptionX,top+20,captionWidth,13.6);
+    captionFit(arabicText,totalCaptionX,top+41,captionWidth,12,false,INK,true);
+    fittedAmount(value,right-12,top+32,right-AMOUNT_START-22,18);
+    line(totalsX,top+SUMMARY_ROW-2,right);
+  };
+  summary('Taxable Amount','المبلغ الخاضع للضريبة',subtotal,totalsTop);
+  summary('Total VAT (15%)','إجمالي الضريبة',vat,totalsTop+SUMMARY_ROW);
+  summary('Total Including VAT','الإجمالي شامل الضريبة',total,totalsTop+SUMMARY_ROW*2);
+  label('Authorized Signatory',left+20,totalsTop+58,17,true);
+  const blueY=totalsTop+SUMMARY_HEIGHT+8;
+  rect(totalsX-6,blueY,right-totalsX+6,BLUE_HEIGHT,BLUE,null);
+  captionFit(proforma?'Proforma Total':'Invoice Total',totalCaptionX,blueY+29,captionWidth,17,true,'#fff');
+  captionFit(proforma?'الإجمالي المبدئي':'إجمالي الفاتورة',totalCaptionX,blueY+55,captionWidth,14,true,'#fff',true);
+  fittedAmount(total,right-13,blueY+43,right-AMOUNT_START-22,20,true,'#fff');
+  captionFit('('+moneyWords(total)+')',totalsX,blueY+BLUE_HEIGHT+26,right-totalsX,13,false,'#555');
+  y=totalsTop+TOTALS_BLOCK_HEIGHT;
+
+  // Bank details and remarks start beside the QR, not beneath it.
+  // Only move to a new page when the remaining area is genuinely insufficient.
+  let lowerTop=y;
+  if(lowerTop+72>bottomLimit){nextPage();lowerTop=155;}
+  const qx=right-205;
+  const leftWidth=invoice?qx-left-22:contentW;
+  if(invoice){
+    captionFit('QR Code',qx,lowerTop+20,QR_SIZE,14,true);
+    const qrAr='رمز الاستجابة السريعة';
+    let qrArSize=13;
+    ctx.save();while(qrArSize>10){ctx.font=font(qrArSize,true,true);if(ctx.measureText(qrAr).width<=QR_SIZE)break;qrArSize-=0.5;}ctx.restore();
+    arabicRight(qrAr,qx+QR_SIZE,lowerTop+45,qrArSize,true);
+    if(qr){
+      ctx.fillStyle='#fff';ctx.fillRect(qx,lowerTop+56,QR_SIZE,QR_SIZE);
+      ctx.drawImage(qr,qx,lowerTop+56,QR_SIZE,QR_SIZE);
+    }else{
+      rect(qx,lowerTop+56,QR_SIZE,QR_SIZE,'#fff8f5','#e4bcad');
+      wrapText('QR unavailable',qx+12,lowerTop+98,QR_SIZE-24,14,true,COLORS.warn);
+    }
+  }
+  let cursor=lowerTop+21;
+  let notesWidth=leftWidth;
+  const ensureRoom=(height)=>{
+    if(cursor+height>bottomLimit){nextPage();cursor=166;notesWidth=contentW;}
+  };
   if(bankLines.length){
-    ensureRoom(39+bankLines.length*27);
-    label('Bank Details / التفاصيل البنكية',left,cursor,17,true);
+    ensureRoom(34);
+    captionFit('Bank Details / التفاصيل البنكية',left,cursor,notesWidth,16,true);
     cursor+=30;
     for(const [key,value] of bankLines){
-      ensureRoom(27);
-      captionFit(key+': '+short(value,100),left,cursor,contentW,16);
-      cursor+=27;
+      ensureRoom(25);
+      captionFit(key+': '+short(value,100),left,cursor,notesWidth,15);
+      cursor+=25;
     }
-    cursor+=10;
+    cursor+=8;
   }
   if(notes){
-    ensureRoom(55);
-    label('Remarks / Notes / ملاحظات',notesX,cursor,17,true);
+    ensureRoom(53);
+    captionFit('Remarks / Notes / ملاحظات',left,cursor,notesWidth,16,true);
     cursor+=27;
     const noteWords=clean(notes).split(/\s+/);
-    const noteMeasure=(value)=>{ctx.save();ctx.font=font(16);const w=ctx.measureText(value).width;ctx.restore();return w;};
+    const noteMeasure=value=>{ctx.save();ctx.font=font(15);const w=ctx.measureText(value).width;ctx.restore();return w;};
     let lineText='';
     const flush=()=>{
       if(!lineText)return;
-      if(cursor+28>bottomLimit){
-        nextPage();cursor=168;notesWidth=contentW;
-        label('Remarks / Notes (continued)',notesX,cursor,17,true);
-        cursor+=33;
+      if(cursor+26>bottomLimit){
+        nextPage();cursor=166;notesWidth=contentW;
+        label('Remarks / Notes (continued)',left,cursor,16,true);
+        cursor+=30;
       }
-      label(lineText,notesX,cursor,16);cursor+=28;lineText='';
+      label(lineText,left,cursor,15);cursor+=26;lineText='';
     };
     for(const word of noteWords){
-      // The measurement must use the correct font AFTER a page change.
-      // Otherwise long notes were measured in the browser's 10px default font
-      // and printed at 21px, crossing the right page margin.
       let remaining=word;
       while(remaining){
         let piece=remaining;
-        while(piece.length>1 && noteMeasure(piece)>notesWidth)piece=piece.slice(0,-1);
+        while(piece.length>1&&noteMeasure(piece)>notesWidth)piece=piece.slice(0,-1);
         remaining=remaining.slice(piece.length);
         const combined=lineText?lineText+' '+piece:piece;
         if(lineText&&noteMeasure(combined)>notesWidth)flush();
@@ -515,6 +516,8 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
     }
     flush();
   }
+  // QR occupies its own right-hand zone. It does not force bank details or notes down.
+  cursor=Math.max(cursor,invoice?lowerTop+QR_ZONE_HEIGHT:cursor);
   y=cursor+12;
   // Compact Code128-style barcode is intentionally omitted rather than inventing
   // an invalid barcode. Existing QR remains scannable.
