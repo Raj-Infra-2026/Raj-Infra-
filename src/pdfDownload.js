@@ -231,9 +231,16 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   // Compact lower zone: signatory stays above notes, QR on the right.
   const notes=uniqueNotes(doc.notes||doc.remarks||doc.remark);
   const lowerTop=y;
-  if(notes){label('Remarks / Notes / ملاحظات',left,lowerTop+16,17,true);wrapText(notes,left,lowerTop+44,Math.max(340,contentW-310),16,false,COLORS.ink,23,5)}
+  // Keep QR location and 190 x 190 size unchanged. Notes start below its bottom edge.
   if(invoice){const qx=right-210;label('QR Code / رمز الاستجابة السريعة',qx,lowerTop+16,16,true);if(qr){ctx.fillStyle='#fff';ctx.fillRect(qx,lowerTop+25,190,190);ctx.drawImage(qr,qx,lowerTop+25,190,190)}else{rect(qx,lowerTop+25,190,170,'#fff8f5','#e4bcad');wrapText('QR unavailable',qx+12,lowerTop+58,165,16,true,COLORS.warn)}}
-  y=lowerTop+(invoice?225:notes?Math.min(160,65+notes.length/3):20);
+  const notesTop=invoice?lowerTop+235:lowerTop+16; // QR ends at lowerTop + 215
+  let notesEnd=notesTop;
+  if(notes){
+    // A new page is preferable to covering the fixed footer on long invoices.
+    if(notesTop+66>H-165){nextPage();notesEnd=166;label('Remarks / Notes / ملاحظات',left,notesEnd,17,true);notesEnd=wrapText(notes,left,notesEnd+28,contentW,16,false,COLORS.ink,23,5)}
+    else {label('Remarks / Notes / ملاحظات',left,notesTop,17,true);notesEnd=wrapText(notes,left,notesTop+28,contentW,16,false,COLORS.ink,23,5)}
+  }
+  y=notes?notesEnd+16:(invoice?lowerTop+225:lowerTop+20);
   const bankLines=[['Bank Name',doc.bank_name],['A/c Name',doc.bank_account_name],['Account No.',doc.bank_account_number],['IBAN No.',doc.iban||doc.bank_iban],['SWIFT No.',doc.swift||doc.bank_swift]].filter(([k,v])=>clean(v));
   if(bankLines.length){if(y+bankLines.length*24+75>H-165){nextPage();y=150}label('Bank Details',left,y+24,18,true);y+=54;for(const [k,v] of bankLines){label(k+': '+v,left,y,16);y+=24}y+=18}
   // Compact Code128-style barcode is intentionally omitted rather than inventing
