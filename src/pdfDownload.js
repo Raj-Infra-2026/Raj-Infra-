@@ -96,15 +96,28 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
     label(value,x,baseline,size,bold,color,'right',true);
   // Footer lines are centered and wrapped independently so longer registered
   // addresses stay within the A4 margins.
-  const footerWrap=(value,baseline,size)=>{
-    const content=clean(value);if(!content)return;
-    ctx.save();ctx.font=font(size,false);const chunks=[];let current='';
-    for(const word of content.split(/\s+/)){
-      const next=current?current+' '+word:word;
-      if(ctx.measureText(next).width>W-margin*2 && current){chunks.push(current);current=word}else current=next;
+  // Center footer lines with measured widths; long URLs and Arabic names cannot spill off-page.
+  const footerWrap=(value,baseline,size,arabicText=false,bold=false)=>{
+    const content=clean(value);if(!content)return 0;
+    const maxWidth=W-margin*2-40;
+    let currentSize=size;
+    ctx.save();
+    while(currentSize>10){ctx.font=font(currentSize,bold,arabicText);if(ctx.measureText(content).width<=maxWidth)break;currentSize-=0.5;}
+    const chunks=[];
+    if(ctx.measureText(content).width<=maxWidth)chunks.push(content);
+    else {
+      let line='';
+      for(const word of content.split(/\s+/)){
+        const candidate=line?line+' '+word:word;
+        if(line&&ctx.measureText(candidate).width>maxWidth){chunks.push(line);line=word;}else line=candidate;
+        // Break unspaced long strings (e.g. URLs) rather than clipping them.
+        while(ctx.measureText(line).width>maxWidth){let n=line.length-1;while(n>1&&ctx.measureText(line.slice(0,n)).width>maxWidth)n--;chunks.push(line.slice(0,n));line=line.slice(n);}
+      }
+      if(line)chunks.push(line);
     }
-    if(current)chunks.push(current);ctx.restore();
-    chunks.slice(0,2).forEach((part,i)=>label(part,W/2,baseline+i*(size+3),size,false,COLORS.gray,'center'));
+    ctx.restore();
+    chunks.forEach((part,i)=>label(part,W/2,baseline+i*(currentSize+7),currentSize,bold,COLORS.gray,'center',arabicText));
+    return chunks.length*(currentSize+7);
   };
   function wrapText(str,x,yy,maxWidth,size=20,bold=false,color=COLORS.ink,lineH=size+8,maxLines=100){
     ctx.font=font(size,bold);let count=0;
@@ -132,12 +145,22 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
     const footerEmail=clean(doc.seller_email||doc.company_email);
     const footerWebsite=clean(doc.seller_website||doc.company_website);
     const contactLine=[footerEmail&&'Email: '+footerEmail,footerWebsite&&'Website: '+footerWebsite].filter(Boolean).join('  |  ');
-    let footerY=H-199;
-    if(footerName){footerWrap(footerName,footerY,17);footerY+=26;}
-    if(footerArabicName){label(footerArabicName,W/2,footerY,17,true,COLORS.ink,'center',true);footerY+=26;}
+    // Fixed footer zone, sized from actual content so the contact line stays above page number.
     const footerAddress=clean(doc.seller_address||doc.sender_address||doc.company_address);
-    if(footerAddress){footerWrap(footerAddress,footerY,15);footerY+=44;}
-    if(contactLine)footerWrap(contactLine,Math.min(footerY,H-47),13);
+    const footerRows=[
+      footerName&&[footerName,17,false,true],
+      footerArabicName&&[footerArabicName,17,true,true],
+      footerAddress&&[footerAddress,14,false,false],
+      contactLine&&[contactLine,12,false,false]
+    ].filter(Boolean);
+    const footerStart=H-198,footerEnd=H-39;
+    let footerY=footerStart;
+    for(const [value,size,arabicText,bold] of footerRows){
+      const remaining=footerEnd-footerY;
+      if(remaining<15)break;
+      const used=footerWrap(value,footerY,Math.min(size,Math.max(10,remaining/3)),arabicText,bold);
+      footerY+=Math.min(used+3,remaining);
+    }
     label(`Page ${page}`,right,H-27,13,false,COLORS.gray,'right');
     y=140;
     return canvas;
@@ -335,37 +358,40 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   });
   // No decorative empty item rows: preserve space for totals, notes and footer.
   // Keep the Total label in its own cell, away from the numeric columns.
-  if(y+390>H-244){nextPage();y=145;tableHeader();}
+  if(y+520>H-244){nextPage();y=145;tableHeader();}
   rect(left,y,contentW,48,'#d9dce2',null);rightText('Total',col[4]-12,y+33,18,true);amountText(subtotal,col[5]-10,y+33,16,true);amountText(total,right-10,y+33,16,true);y+=58;
-  if(y+340>H-244){nextPage();y=155}
-  const totalsX=535,totalsValX=right-4;
-  // Reserve an independent right-aligned amount column so long bilingual
-  // captions cannot run into SAR values. Shrink captions only when needed.
-  const amountColumnLeft=960;
-  const fittedLabel=(value,x,baseline,maxWidth,preferred=17,bold=false,color=COLORS.ink)=>{
+  if(y+425>H-244){nextPage();y=155}
+  // Bilingual totals: dedicated caption and amount zones; never draw mixed RTL/LTR text.
+  const totalsX=505,totalsValX=right-8;
+  const amountColumnLeft=955;
+  const fittedLabel=(value,x,baseline,maxWidth,preferred=17,bold=false,color=COLORS.ink,align='left',arabicText=false)=>{
     let size=preferred;
-    while(size>12){ctx.font=font(size,bold);if(ctx.measureText(value).width<=maxWidth)break;size-=0.5;}
-    label(value,x,baseline,size,bold,color);
+    ctx.save();
+    while(size>10){ctx.font=font(size,bold,arabicText);if(ctx.measureText(value).width<=maxWidth)break;size-=0.5;}
+    ctx.restore();
+    label(value,x,baseline,size,bold,color,align,arabicText);
   };
-  const summary=(caption,val,yy,bold=false)=>{
-    fittedLabel(caption,totalsX,yy,amountColumnLeft-totalsX-18,17,bold);
-    amountText(val,totalsValX,yy,18,bold);
+  const summary=(english,arabicText,val,yy,bold=false)=>{
+    const captionWidth=amountColumnLeft-totalsX-24;
+    fittedLabel(english,totalsX,yy,captionWidth,15,bold);
+    fittedLabel(arabicText,amountColumnLeft-20,yy+23,captionWidth,14,bold,COLORS.ink,'right',true);
+    amountText(val,totalsValX,yy+9,17,bold);
   };
-  summary('Taxable Amount / المبلغ الخاضع للضريبة:',subtotal,y);
-  summary('Total VAT (15%) / إجمالي الضريبة:',vat,y+38);
-  summary('Total Including VAT / الإجمالي شامل الضريبة:',total,y+76);
-  // Signature area intentionally blank: never fabricate a real signature or stamp.
-  label('Authorized Signatory',left+30,y+64,18,true);
-  rect(totalsX-5,y+103,right-totalsX+5,57,BLUE,null);
-  fittedLabel(proforma?'Proforma Total / الإجمالي المبدئي:':'Invoice Total / إجمالي الفاتورة:',totalsX+8,y+140,amountColumnLeft-totalsX-22,21,true,'#fff');
-  amountText(total,right-10,y+140,23,true,'#fff');
-  cellLabel('('+moneyWords(total)+')',right,y+187,contentW,16,false,'#555','right');
-  y+=185;
+  summary('Taxable Amount','المبلغ الخاضع للضريبة',subtotal,y);
+  summary('Total VAT (15%)','إجمالي الضريبة',vat,y+55);
+  summary('Total Including VAT','الإجمالي شامل الضريبة',total,y+110);
+  label('Authorized Signatory',left+20,y+73,17,true);
+  rect(totalsX-6,y+158,right-totalsX+6,79,BLUE,null);
+  fittedLabel(proforma?'Proforma Total':'Invoice Total',totalsX+10,y+187,amountColumnLeft-totalsX-32,19,true,'#fff');
+  fittedLabel(proforma?'الإجمالي المبدئي':'إجمالي الفاتورة',amountColumnLeft-18,y+220,amountColumnLeft-totalsX-32,15,true,'#fff','right',true);
+  amountText(total,right-12,y+199,21,true,'#fff');
+  cellLabel('('+moneyWords(total)+')',right,y+270,contentW,15,false,'#555','right');
+  y+=275;
   // Compact lower zone: signatory stays above notes, QR on the right.
-  if(invoice && y+245>H-244){nextPage();y=155;}
+  if(invoice && y+250>H-244){nextPage();y=155;}
   const lowerTop=y;
   // Keep QR location and 190 x 190 size unchanged. Notes start below its bottom edge.
-  if(invoice){const qx=right-210;label('QR Code / رمز الاستجابة السريعة',qx,lowerTop+16,16,true);if(qr){ctx.fillStyle='#fff';ctx.fillRect(qx,lowerTop+25,190,190);ctx.drawImage(qr,qx,lowerTop+25,190,190)}else{rect(qx,lowerTop+25,190,170,'#fff8f5','#e4bcad');wrapText('QR unavailable',qx+12,lowerTop+58,165,16,true,COLORS.warn)}}
+  if(invoice){const qx=right-210;label('QR Code',qx,lowerTop+16,14,true);arabicRight('رمز الاستجابة السريعة',right,lowerTop+16,12,true);if(qr){ctx.fillStyle='#fff';ctx.fillRect(qx,lowerTop+25,190,190);ctx.drawImage(qr,qx,lowerTop+25,190,190)}else{rect(qx,lowerTop+25,190,190,'#fff8f5','#e4bcad');wrapText('QR unavailable',qx+12,lowerTop+58,165,14,true,COLORS.warn)}}
   // Optional bank details are per-document only, never prefilled or hardcoded.
   // They appear below the QR and immediately above remarks, in both preview and final.
   const bankLines=[
