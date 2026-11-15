@@ -167,7 +167,7 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   if(doc.seller_vat)label('VAT: '+doc.seller_vat,left,163,16);
   const sellerAddress=clean(doc.seller_address||doc.sender_address||doc.company_address);
   // Company address appears in footer only; never duplicate it in the top-left header.
-  if(logo){const scale=Math.min(273/logo.width,152.25/logo.height);const logoW=logo.width*scale,logoH=logo.height*scale;ctx.save();ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(logo,(W-logoW)/2,52+(145-logoH)/2,logoW,logoH);ctx.restore()}
+  if(logo){const scale=Math.min(300/logo.width,182.25/logo.height);const logoW=logo.width*scale,logoH=logo.height*scale;ctx.save();ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(logo,(W-logoW)/2,52+(145-logoH)/2,logoW,logoH);ctx.restore()}
   if(doc.seller_name_ar||doc.company_name_ar)arabicRight(short(doc.seller_name_ar||doc.company_name_ar,70),right,100,21,true);
   const arabicIndicDigits = value => String(value ?? '').replace(/[0-9]/g, digit => '٠١٢٣٤٥٦٧٨٩'[Number(digit)]);
   if(doc.seller_cr)arabicRight('السجل التجاري: '+arabicIndicDigits(doc.seller_cr),right,133,16);
