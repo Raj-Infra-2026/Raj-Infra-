@@ -92,6 +92,26 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
     const textStart=x-width;label(value,textStart,baseline,size,bold,color,'left');
     drawRiyal(textStart-gap-glyphW,baseline,size,color);
   };
+  // Draw the official Riyal glyph and an amount as ONE measured unit. The amount
+  // can never extend into a neighbouring table cell, even for multi-million values.
+  const fittedAmount=(value,rightEdge,baseline,availableWidth,preferredSize=17,bold=false,color=COLORS.ink)=>{
+    const formatted=Number(value||0).toLocaleString('en-SA',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const widthAt=(size)=>{
+      ctx.save();ctx.font=font(size,bold);
+      const width=ctx.measureText(formatted).width+size*0.94*(1124.14/1256.39)+7;
+      ctx.restore();return width;
+    };
+    let size=preferredSize;
+    while(size>10 && widthAt(size)>availableWidth)size-=0.5;
+    const naturalWidth=widthAt(size);
+    ctx.save();
+    if(naturalWidth>availableWidth){
+      // Worst-case large totals: compress horizontally, never print across a border.
+      ctx.translate(rightEdge,0);ctx.scale(availableWidth/naturalWidth,1);
+      amountText(value,0,baseline,size,bold,color);
+    }else amountText(value,rightEdge,baseline,size,bold,color);
+    ctx.restore();
+  };
   const arabicRight=(value,x,baseline,size=17,bold=false,color=COLORS.ink)=>
     label(value,x,baseline,size,bold,color,'right',true);
   // Footer lines are centered and wrapped independently so longer registered
@@ -116,19 +136,28 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
       if(line)chunks.push(line);
     }
     ctx.restore();
-    chunks.forEach((part,i)=>label(part,W/2,baseline+i*(currentSize+7),currentSize,bold,COLORS.gray,'center',arabicText));
-    return chunks.length*(currentSize+7);
+    chunks.forEach((part,i)=>label(part,W/2,baseline+i*(currentSize*1.32+6),currentSize,bold,COLORS.gray,'center',arabicText));
+    return chunks.length*(currentSize*1.32+6);
   };
   function wrapText(str,x,yy,maxWidth,size=20,bold=false,color=COLORS.ink,lineH=size+8,maxLines=100){
-    ctx.font=font(size,bold);let count=0;
-    for(const line of clean(str).replace(/\r/g,'').split('\n')){
-      let words=line.split(/\s+/),buffer='';
-      for(const word of words){
-        const joined=buffer?buffer+' '+word:word;
-        if(ctx.measureText(joined).width>maxWidth && buffer){label(buffer,x,yy,size,bold,color);yy+=lineH;count++;buffer=word;if(count>=maxLines)return yy;}
-        else buffer=joined;
+    // Measure with the real rendered font and split even words without spaces.
+    const measure=(value)=>{ctx.save();ctx.font=font(size,bold);const w=ctx.measureText(value).width;ctx.restore();return w;};
+    let count=0,buffer='';
+    const write=()=>{if(!buffer)return false;label(buffer,x,yy,size,bold,color);yy+=lineH;count++;buffer='';return count>=maxLines;};
+    for(const sourceLine of clean(str).replace(/\r/g,'').split('\n')){
+      for(const word of sourceLine.split(/\s+/).filter(Boolean)){
+        let part=word;
+        while(part){
+          let chunk=part;
+          while(chunk.length>1 && measure(chunk)>maxWidth)chunk=chunk.slice(0,-1);
+          part=part.slice(chunk.length);
+          const combined=buffer?buffer+' '+chunk:chunk;
+          if(buffer && measure(combined)>maxWidth && write())return yy;
+          buffer=buffer?buffer+' '+chunk:chunk;
+          if(part && write())return yy;
+        }
       }
-      if(buffer){label(buffer,x,yy,size,bold,color);yy+=lineH;count++;if(count>=maxLines)return yy;}
+      if(write())return yy;
     }
     return yy;
   }
@@ -283,7 +312,8 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   if(doc.po_number||doc.reference_number){label('PO Number / رقم أمر الشراء',mx,metaY+66,16,true);rightText(short(doc.po_number||doc.reference_number,23),right,metaY+66,17)}
   y=Math.max(metaY+116,customerY+22);
   // Item grid uses reference's blue bilingual header and full-width column rules.
-  const col=[left,left+42,left+610,left+708,left+842,left+984,right];
+  // Preserve the six-column blue table; give currency columns sufficient width.
+  const col=[left,left+43,left+495,left+591,left+754,left+920,right];
   const gridRow=(yy,height,fill='#fff')=>{rect(left,yy,contentW,height,fill,'#c9c9c9');ctx.strokeStyle='#d3d3d3';ctx.lineWidth=1;for(const x of col.slice(1,-1)){ctx.beginPath();ctx.moveTo(x,yy);ctx.lineTo(x,yy+height);ctx.stroke()}};
   const cellLabel=(text,x,yy,maxWidth,size=15,bold=true,color='#fff',align='left',ar=false)=>{
     let actual=size;
@@ -295,7 +325,7 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   function tableHeader(){
     const yy=y;rect(left,yy,contentW,92,BLUE,null);
     cellLabel('#',left+8,yy+32,30,16);
-    cellLabel('Item / وصف الصنف',left+54,yy+34,530,17);
+    cellLabel('Item / وصف الصنف',left+54,yy+34,col[2]-col[1]-20,17);
     cellLabel('Qty /',col[3]-7,yy+30,col[3]-col[2]-12,15,true,'#fff','right');
     cellLabel('الكمية',col[3]-7,yy+62,col[3]-col[2]-12,14,true,'#fff','right',true);
     cellLabel('Unit Price /',col[4]-7,yy+30,col[4]-col[3]-12,14,true,'#fff','right');
@@ -313,7 +343,7 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   items.forEach((item,i)=>{
     const qty=Number(item.quantity||0),price=Number(item.unit_price||0),taxable=round(qty*price),incl=round(taxable*1.15);
     const desc=clean(item.description||'Item');
-    const maxDescWidth=col[2]-col[1]-28;
+    const maxDescWidth=col[2]-col[1]-22;
     ctx.font=font(17);
     const words=desc.split(/\s+/),segments=[];let current='';
     for(const word of words){
@@ -343,55 +373,88 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
       if(offset===0){
         label(String(i+1),left+10,y+35,16);
         cellLabel(fmt(qty),col[3]-8,y+35,col[3]-col[2]-14,15,false,INK,'right');
-        // Fit monetary values into their cells, retaining the official Riyal symbol.
-        const safeAmount=(value,endX,startX)=>{
-          let size=15;
-          ctx.save();
-          while(size>10){ctx.font=font(size);const width=ctx.measureText(fmt(value)).width+size*1.05+7;if(width<=endX-startX-14)break;size-=0.5;}
-          ctx.restore();amountText(value,endX-8,y+35,size);
-        };
-        safeAmount(price,col[4],col[3]);safeAmount(taxable,col[5],col[4]);safeAmount(incl,right,col[5]);
+        // Keep numbers and their Riyal symbols inside their own table cells.
+        const cellMoney=(value,startX,endX)=>
+          fittedAmount(value,endX-10,y+38,endX-startX-22,15);
+        cellMoney(price,col[3],col[4]);
+        cellMoney(taxable,col[4],col[5]);
+        cellMoney(incl,col[5],right);
       }
       segments.slice(offset,offset+take).forEach((v,k)=>label(v,left+54,y+35+k*32,17));
       y+=h;offset+=take;
     }
   });
-  // No decorative empty item rows: preserve space for totals, notes and footer.
-  // Keep the Total label in its own cell, away from the numeric columns.
-  if(y+520>H-244){nextPage();y=145;tableHeader();}
-  rect(left,y,contentW,48,'#d9dce2',null);rightText('Total',col[4]-12,y+33,18,true);amountText(subtotal,col[5]-10,y+33,16,true);amountText(total,right-10,y+33,16,true);y+=58;
-  if(y+425>H-244){nextPage();y=155}
-  // Bilingual totals: dedicated caption and amount zones; never draw mixed RTL/LTR text.
-  const totalsX=505,totalsValX=right-8;
-  const amountColumnLeft=955;
-  const fittedLabel=(value,x,baseline,maxWidth,preferred=17,bold=false,color=COLORS.ink,align='left',arabicText=false)=>{
+  // Table subtotal row: retain the original grey band and all three labels/amounts,
+  // but measure each amount within its own cell instead of letting the two totals collide.
+  const CONTENT_BOTTOM=H-244;
+  if(y+62>CONTENT_BOTTOM)newItemPage();
+  gridRow(y,55,'#d9dce2');
+  rightText('Total',col[4]-12,y+35,18,true);
+  fittedAmount(subtotal,col[5]-10,y+35,col[5]-col[4]-22,16,true);
+  fittedAmount(total,right-10,y+35,right-col[5]-22,16,true);
+  y+=70;
+
+  // Preserve the invoice's bilingual totals block and blue Invoice Total band.
+  // Captions and amounts are independent columns, measured to fit, with a fixed
+  // row height for the English/Arabic pair rather than overlapping baselines.
+  const totalsX=505;
+  const AMOUNT_START=971;
+  const totalCaptionX=totalsX+14;
+  const captionWidth=AMOUNT_START-totalCaptionX-24;
+  const captionFit=(text,x,baseline,maxWidth,preferred=17,bold=false,color=INK,arabicText=false)=>{
+    if(!clean(text))return;
     let size=preferred;
     ctx.save();
-    while(size>10){ctx.font=font(size,bold,arabicText);if(ctx.measureText(value).width<=maxWidth)break;size-=0.5;}
+    while(size>10){ctx.font=font(size,bold,arabicText);if(ctx.measureText(text).width<=maxWidth)break;size-=0.5;}
+    const measured=ctx.measureText(text).width;
     ctx.restore();
-    label(value,x,baseline,size,bold,color,align,arabicText);
+    ctx.save();
+    if(measured>maxWidth){ctx.translate(x,0);ctx.scale(maxWidth/measured,1);label(text,0,baseline,size,bold,color,'left',arabicText);}
+    else label(text,x,baseline,size,bold,color,'left',arabicText);
+    ctx.restore();
   };
-  const summary=(english,arabicText,val,yy,bold=false)=>{
-    const captionWidth=amountColumnLeft-totalsX-24;
-    fittedLabel(english,totalsX,yy,captionWidth,15,bold);
-    fittedLabel(arabicText,amountColumnLeft-20,yy+23,captionWidth,14,bold,COLORS.ink,'right',true);
-    amountText(val,totalsValX,yy+9,17,bold);
+  const TOTALS_BLOCK_HEIGHT=350;
+  const QR_ZONE_HEIGHT=255;
+  // Keep the complete totals and QR above the footer; move together if needed.
+  if(y+TOTALS_BLOCK_HEIGHT+(invoice?QR_ZONE_HEIGHT:0)>CONTENT_BOTTOM){nextPage();y=155;}
+  const totalsTop=y;
+  const summary=(english,arabicText,value,top)=>{
+    captionFit(english,totalCaptionX,top+25,captionWidth,17);
+    captionFit(arabicText,totalCaptionX,top+53,captionWidth,15,false,INK,true);
+    fittedAmount(value,right-12,top+42,right-AMOUNT_START-22,18);
+    line(totalsX,top+66,right);
   };
-  summary('Taxable Amount','المبلغ الخاضع للضريبة',subtotal,y);
-  summary('Total VAT (15%)','إجمالي الضريبة',vat,y+55);
-  summary('Total Including VAT','الإجمالي شامل الضريبة',total,y+110);
-  label('Authorized Signatory',left+20,y+73,17,true);
-  rect(totalsX-6,y+158,right-totalsX+6,79,BLUE,null);
-  fittedLabel(proforma?'Proforma Total':'Invoice Total',totalsX+10,y+187,amountColumnLeft-totalsX-32,19,true,'#fff');
-  fittedLabel(proforma?'الإجمالي المبدئي':'إجمالي الفاتورة',amountColumnLeft-18,y+220,amountColumnLeft-totalsX-32,15,true,'#fff','right',true);
-  amountText(total,right-12,y+199,21,true,'#fff');
-  cellLabel('('+moneyWords(total)+')',right,y+270,contentW,15,false,'#555','right');
-  y+=275;
-  // Compact lower zone: signatory stays above notes, QR on the right.
-  if(invoice && y+250>H-244){nextPage();y=155;}
+  summary('Taxable Amount','المبلغ الخاضع للضريبة',subtotal,totalsTop);
+  summary('Total VAT (15%)','إجمالي الضريبة',vat,totalsTop+69);
+  summary('Total Including VAT','الإجمالي شامل الضريبة',total,totalsTop+138);
+  label('Authorized Signatory',left+20,totalsTop+92,17,true);
+  const blueY=totalsTop+219;
+  rect(totalsX-6,blueY,right-totalsX+6,90,BLUE,null);
+  captionFit(proforma?'Proforma Total':'Invoice Total',totalCaptionX,blueY+36,captionWidth,19,true,'#fff');
+  captionFit(proforma?'الإجمالي المبدئي':'إجمالي الفاتورة',totalCaptionX,blueY+70,captionWidth,16,true,'#fff',true);
+  fittedAmount(total,right-13,blueY+57,right-AMOUNT_START-22,21,true,'#fff');
+  // Amount in words gets its own line BELOW the blue bar, never over the labels.
+  captionFit('('+moneyWords(total)+')',totalsX,blueY+126,right-totalsX,14,false,'#555');
+  y=totalsTop+TOTALS_BLOCK_HEIGHT;
+
+  // The QR header is deliberately two rows; English and Arabic never share space.
   const lowerTop=y;
-  // Keep QR location and 190 x 190 size unchanged. Notes start below its bottom edge.
-  if(invoice){const qx=right-210;label('QR Code',qx,lowerTop+16,14,true);arabicRight('رمز الاستجابة السريعة',right,lowerTop+16,12,true);if(qr){ctx.fillStyle='#fff';ctx.fillRect(qx,lowerTop+25,190,190);ctx.drawImage(qr,qx,lowerTop+25,190,190)}else{rect(qx,lowerTop+25,190,190,'#fff8f5','#e4bcad');wrapText('QR unavailable',qx+12,lowerTop+58,165,14,true,COLORS.warn)}}
+  if(invoice){
+    const qx=right-205,qrSize=190;
+    captionFit('QR Code',qx,lowerTop+22,qrSize,14,true);
+    // Right aligned Arabic label, fitted inside the QR column.
+    const qrAr='رمز الاستجابة السريعة';
+    let qrArSize=13;
+    ctx.save();while(qrArSize>10){ctx.font=font(qrArSize,true,true);if(ctx.measureText(qrAr).width<=qrSize)break;qrArSize-=0.5;}ctx.restore();
+    arabicRight(qrAr,qx+qrSize,lowerTop+48,qrArSize,true);
+    if(qr){
+      ctx.fillStyle='#fff';ctx.fillRect(qx,lowerTop+60,qrSize,qrSize);
+      ctx.drawImage(qr,qx,lowerTop+60,qrSize,qrSize);
+    }else{
+      rect(qx,lowerTop+60,qrSize,qrSize,'#fff8f5','#e4bcad');
+      wrapText('QR unavailable',qx+12,lowerTop+99,qrSize-24,14,true,COLORS.warn);
+    }
+  }
   // Optional bank details are per-document only, never prefilled or hardcoded.
   // They appear below the QR and immediately above remarks, in both preview and final.
   const bankLines=[
@@ -406,7 +469,7 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   const notesBesideQr=invoice && !bankLines.length && notes.length>0 && notes.length<=180;
   const notesX=left;
   let notesWidth=notesBesideQr?(right-245-left):contentW;
-  let cursor=notesBesideQr?lowerTop+33:(invoice?lowerTop+226:lowerTop+16);
+  let cursor=notesBesideQr?lowerTop+40:(invoice?lowerTop+270:lowerTop+16);
   const ensureRoom=(height)=>{if(cursor+height>bottomLimit){nextPage();cursor=158;notesWidth=contentW;}};
   if(bankLines.length){
     ensureRoom(39+bankLines.length*27);
@@ -414,7 +477,7 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
     cursor+=30;
     for(const [key,value] of bankLines){
       ensureRoom(27);
-      label(key+': '+short(value,100),left,cursor,16);
+      captionFit(key+': '+short(value,100),left,cursor,contentW,16);
       cursor+=27;
     }
     cursor+=10;
@@ -424,13 +487,31 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
     label('Remarks / Notes / ملاحظات',notesX,cursor,17,true);
     cursor+=27;
     const noteWords=clean(notes).split(/\s+/);
+    const noteMeasure=(value)=>{ctx.save();ctx.font=font(16);const w=ctx.measureText(value).width;ctx.restore();return w;};
     let lineText='';
-    const flush=()=>{if(!lineText)return;ensureRoom(24);label(lineText,notesX,cursor,16);cursor+=24;lineText='';};
+    const flush=()=>{
+      if(!lineText)return;
+      if(cursor+28>bottomLimit){
+        nextPage();cursor=168;notesWidth=contentW;
+        label('Remarks / Notes (continued)',notesX,cursor,17,true);
+        cursor+=33;
+      }
+      label(lineText,notesX,cursor,16);cursor+=28;lineText='';
+    };
     for(const word of noteWords){
-      const candidate=lineText?lineText+' '+word:word;
-      ctx.font=font(16);
-      if(ctx.measureText(candidate).width>notesWidth && lineText)flush();
-      lineText=lineText?lineText+' '+word:word;
+      // The measurement must use the correct font AFTER a page change.
+      // Otherwise long notes were measured in the browser's 10px default font
+      // and printed at 21px, crossing the right page margin.
+      let remaining=word;
+      while(remaining){
+        let piece=remaining;
+        while(piece.length>1 && noteMeasure(piece)>notesWidth)piece=piece.slice(0,-1);
+        remaining=remaining.slice(piece.length);
+        const combined=lineText?lineText+' '+piece:piece;
+        if(lineText&&noteMeasure(combined)>notesWidth)flush();
+        lineText=lineText?lineText+' '+piece:piece;
+        if(remaining)flush();
+      }
     }
     flush();
   }
