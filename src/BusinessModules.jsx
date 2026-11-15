@@ -213,7 +213,7 @@ export function CompanySettingsPage({ request, onChanged }) {
     useEffect(() => {
         let mounted = true;
         request('/company-settings')
-            .then(data => { if (mounted) setProfile({ ...(data.company || {}), saved_logo_data: data.company?.logo_data || '' }); })
+            .then(data => { if (mounted) setProfile(data.company || {}); })
             .catch(err => { if (mounted) setError(err.message); })
             .finally(() => { if (mounted) setLoading(false); });
         return () => { mounted = false; };
@@ -229,18 +229,9 @@ export function CompanySettingsPage({ request, onChanged }) {
         }
         setSaving(true);
         try {
-            let logoKey = profile.logo_storage_key || '';
-            if (profile.logo_data?.startsWith('data:image/')) {
-                // Upload only if the image differs from the last saved logo.
-                if (profile.logo_data !== profile.saved_logo_data) {
-                    const uploaded = await request('/company-logo', { method: 'PUT', body: JSON.stringify({ image: profile.logo_data }) });
-                    logoKey = uploaded.logo_key;
-                }
-            } else if (!profile.logo_data) logoKey = '';
-            const result = await request('/company-settings', { method: 'PUT', body: JSON.stringify({ ...profile, logo_data: logoKey }) });
-            const updated = { ...result.company, logo_data: profile.logo_data, logo_storage_key: logoKey, saved_logo_data: profile.logo_data };
-            setProfile(updated);
-            onChanged?.(updated);
+            const result = await request('/company-settings', { method: 'PUT', body: JSON.stringify(profile) });
+            setProfile(result.company || profile);
+            onChanged?.(result.company || profile);
             setMessage('Company details saved successfully.');
         } catch (err) {
             setError(err.message);
@@ -249,23 +240,42 @@ export function CompanySettingsPage({ request, onChanged }) {
         }
     }
 
-    async function uploadLogo(file) {
-      if (!file) return;
-      if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 2 * 1024 * 1024) {
-        setError('Choose a PNG, JPG or WebP logo up to 2 MB.');
-        return;
+    async function uploadLogo(file){
+      if(!file) return;
+      if(!['image/png','image/jpeg','image/webp'].includes(file.type) || file.size > 3*1024*1024) {
+          setError('Choose a PNG, JPG or WebP image under 3 MB.');
+          return;
       }
       try {
-        // Keep original pixels and transparency; do not convert a sharp PNG to WebP.
-        const data = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = () => reject(Error('Unable to read image file'));
-          reader.readAsDataURL(file);
-        });
-        setProfile(old => ({ ...old, logo_data: data }));
+        const url = URL.createObjectURL(file);
+        const image = new Image();
+        try { await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=reject;image.src=url}); } finally { URL.revokeObjectURL(url); }
+        // Google Sheets cells cannot hold more than 50,000 characters.
+        // Resize and encode until the complete data URL fits safely; never truncate it.
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        if (!context) throw Error('Your browser cannot process this image.');
+        let data = '';
+        const maxDataLength = 49000;
+        const maxSide = Math.min(900, Math.max(image.width, image.height));
+        for (const side of [maxSide, 700, 560, 440, 340, 260, 180, 120]) {
+          const scale = Math.min(1, side / Math.max(image.width, image.height));
+          canvas.width = Math.max(1, Math.round(image.width * scale));
+          canvas.height = Math.max(1, Math.round(image.height * scale));
+          context.clearRect(0, 0, canvas.width, canvas.height);
+          context.imageSmoothingEnabled = true;
+          context.imageSmoothingQuality = 'high';
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
+          for (const quality of [0.90, 0.78, 0.65, 0.50, 0.35, 0.22]) {
+            data = canvas.toDataURL('image/webp', quality);
+            if (data.startsWith('data:image/webp;base64,') && data.length <= maxDataLength) break;
+          }
+          if (data.startsWith('data:image/webp;base64,') && data.length <= maxDataLength) break;
+        }
+        if (!data || data.length > maxDataLength) throw Error('Unable to fit this logo in Company Settings. Try a simpler image.');
+        setProfile(old => ({...old, logo_data: data}));
         setError('');
-      } catch (e) { setError('Could not read logo: ' + e.message); }
+      } catch(e) { setError('Could not process logo: ' + e.message); }
     }
 
     return (
@@ -287,7 +297,7 @@ export function CompanySettingsPage({ request, onChanged }) {
                     <strong>Company logo</strong>
                     <p>Appears next to your company name. PNG, JPG or WebP.</p>
                     <input aria-label="Upload company logo" type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>uploadLogo(e.target.files?.[0])}/>
-                    <button type="button" className="secondary" onClick={()=>setProfile(old=>({...old,logo_data:'',logo_storage_key:'',saved_logo_data:''}))}>Remove logo</button>
+                    <button type="button" className="secondary" onClick={()=>setProfile(old=>({...old,logo_data:''}))}>Remove logo</button>
                 </div>
             </div>
             <div className="company-profile-fields">

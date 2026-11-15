@@ -257,7 +257,7 @@ async function getCompanySettings(env) {
 
 function validateCompanySettings(data) {
     const profile = Object.fromEntries(COMPANY_FIELDS.map(field => [
-        field, String(data[field] ?? '').trim().slice(0, field === 'logo_data' ? 200 : 500)
+        field, String(data[field] ?? '').trim().slice(0, field === 'logo_data' ? 49000 : 500)
     ]));
     profile.invoice_prefix = (profile.invoice_prefix || 'AP').toUpperCase();
     profile.invoice_identifier = (profile.invoice_identifier || 'INV').toUpperCase();
@@ -265,7 +265,7 @@ function validateCompanySettings(data) {
     profile.invoice_start_number = profile.invoice_start_number || '1';
     if (!/^[A-Z0-9]{1,12}$/.test(profile.invoice_prefix) || !/^[A-Z0-9]{1,12}$/.test(profile.invoice_identifier)) throw Error('Invoice prefix and identifier must contain 1-12 letters or digits');
     if (!/^[1-9]\d{0,11}$/.test(profile.invoice_start_number) || !Number.isSafeInteger(Number(profile.invoice_start_number))) throw Error('Invalid invoice starting number');
-    if (profile.logo_data && !/^r2:companies\/[a-zA-Z0-9_-]+\/logo\.(png|jpeg|webp)$/.test(profile.logo_data)) throw Error('Invalid stored company logo reference');
+    if (profile.logo_data && (!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(profile.logo_data) || profile.logo_data.length > 49000)) throw Error('Logo must be a small PNG, JPG, or WebP image');
     for (const field of ['primary_color','secondary_color']) if (profile[field] && !/^#[a-fA-F0-9]{6}$/.test(profile[field])) throw Error('Invalid theme color');
     if (!/^\d{15}$/.test(profile.vat_number))
         throw Error('VAT number must contain exactly 15 digits');
@@ -505,54 +505,13 @@ export default { async fetch(req, env) {
             env = session.tenantEnv;
             if (url.pathname === '/api/me')
                 return reply({ user: { username: user.username, role:'admin', company_name:tenant.company_name } }, 200, origin);
-            // Each tenant owns its own R2 object; tenant ID is derived from the signed session.
-            // Never accept a company ID or object key from the browser for uploads.
-            if (url.pathname === '/api/company-logo' && req.method === 'PUT') {
-                if (!env.LOGO_BUCKET) return reply({ error: 'Logo storage is not configured. Bind LOGO_BUCKET to an R2 bucket.' }, 503, origin);
-                const payload = await req.json();
-                const match = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/.exec(String(payload?.image || ''));
-                if (!match) return reply({ error: 'Choose a valid PNG, JPG, or WebP image.' }, 400, origin);
-                const bytes = Uint8Array.from(atob(match[2]), ch => ch.charCodeAt(0));
-                if (!bytes.length || bytes.length > 2 * 1024 * 1024) return reply({ error: 'Logo must be 2 MB or smaller.' }, 400, origin);
-                const kind = match[1];
-                const valid = kind === 'png' ? bytes[0] === 137 && bytes[1] === 80 && bytes[2] === 78 && bytes[3] === 71
-                    : kind === 'jpeg' ? bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255
-                    : bytes[0] === 82 && bytes[1] === 73 && bytes[2] === 70 && bytes[3] === 70 && bytes[8] === 87 && bytes[9] === 69 && bytes[10] === 66 && bytes[11] === 80;
-                if (!valid) return reply({ error: 'The image file content does not match its type.' }, 400, origin);
-                const key = `companies/${user.tenant_id}/logo.${kind}`;
-                await env.LOGO_BUCKET.put(key, bytes, { httpMetadata: { contentType: `image/${kind}` } });
-                return reply({ logo_key: `r2:${key}` }, 200, origin);
-            }
             if (url.pathname === '/api/company-settings') {
                 if (req.method === 'GET')
-                    {
-                        const company = await getCompanySettings(env);
-                        const key = company.logo_data;
-                        if (key?.startsWith('r2:')) {
-                            // Only resolve a logo inside the current authenticated tenant namespace.
-                            const prefix = `companies/${user.tenant_id}/`;
-                            if (!key.slice(3).startsWith(prefix)) company.logo_data = '';
-                            else if (env.LOGO_BUCKET) {
-                                const object = await env.LOGO_BUCKET.get(key.slice(3));
-                                if (object) {
-                                    const data = new Uint8Array(await object.arrayBuffer());
-                                    let binary = '';
-                                    for (let i = 0; i < data.length; i += 8192) binary += String.fromCharCode(...data.subarray(i, i + 8192));
-                                    company.logo_data = `data:${object.httpMetadata?.contentType || 'image/png'};base64,${btoa(binary)}`;
-                                    company.logo_storage_key = key;
-                                } else company.logo_data = '';
-                            } else company.logo_data = '';
-                        }
-                        return reply({ company }, 200, origin);
-                    }
+                    return reply({ company: await getCompanySettings(env) }, 200, origin);
                 if (req.method === 'PUT') {
                     if (user.role !== 'admin')
                         return reply({ error: 'Only Admin may update company settings' }, 403, origin);
-                    const input = await req.json();
-                    // Accept only the authenticated tenant's own R2 key.
-                    if (input.logo_data?.startsWith('r2:') && !input.logo_data.startsWith(`r2:companies/${user.tenant_id}/`))
-                        return reply({ error: 'Logo does not belong to this company' }, 403, origin);
-                    const company = validateCompanySettings(input);
+                    const company = validateCompanySettings(await req.json());
                     await ensureCompanySettings(env);
                     await companySheet(env, 'PUT', `A1:B${COMPANY_FIELDS.length + 1}`, {
                         values: [COMPANY_HEADERS, ...COMPANY_FIELDS.map(field => [field, company[field]])]
