@@ -167,13 +167,13 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   if(doc.seller_vat)label('VAT: '+doc.seller_vat,left,163,16);
   const sellerAddress=clean(doc.seller_address||doc.sender_address||doc.company_address);
   // Company address appears in footer only; never duplicate it in the top-left header.
-  if(logo){const scale=Math.min(270/logo.width,180/logo.height);ctx.save();ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(logo,(W-logo.width*scale)/2,52,logo.width*scale,logo.height*scale);ctx.restore()}
+  if(logo){const scale=Math.min(260/logo.width,145/logo.height);const logoW=logo.width*scale,logoH=logo.height*scale;ctx.save();ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(logo,(W-logoW)/2,52+(145-logoH)/2,logoW,logoH);ctx.restore()}
   if(doc.seller_name_ar||doc.company_name_ar)arabicRight(short(doc.seller_name_ar||doc.company_name_ar,70),right,100,21,true);
   const arabicIndicDigits = value => String(value ?? '').replace(/[0-9]/g, digit => '٠١٢٣٤٥٦٧٨٩'[Number(digit)]);
   if(doc.seller_cr)arabicRight('السجل التجاري: '+arabicIndicDigits(doc.seller_cr),right,133,16);
   if(doc.seller_vat)arabicRight('الرقم الضريبي: '+arabicIndicDigits(doc.seller_vat),right,163,16);
-  label(heading,W/2,250,invoice||proforma?41*1.20:41,true,INK,'center');
-  if(arabic)label(arabic,W/2,292,invoice||proforma?27*1.20:27,true,INK,'center',true);
+  label(heading,W/2,247,invoice||proforma?41*1.20:41,true,INK,'center');
+  if(arabic)label(arabic,W/2,293,invoice||proforma?27*1.20:27,true,INK,'center',true);
   if(draft){ctx.save();ctx.strokeStyle='#c52222';ctx.lineWidth=4;ctx.strokeRect(right-170,274,164,44);label('PREVIEW',right-157,303,25,true,'#c52222');ctx.restore()}
   // Two-column reference-style metadata, not three shaded boxes.
   const metaY=draft?373:343;
@@ -223,14 +223,14 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
     const qty=Number(item.quantity||0),price=Number(item.unit_price||0),taxable=round(qty*price),incl=round(taxable*1.15);
     const desc=clean(item.description||'Item');ctx.font=font(18);let words=desc.split(/\s+/),segments=[],current='';for(const word of words){const v=current?current+' '+word:word;if(ctx.measureText(v).width>550&&current){segments.push(current);current=word}else current=v}if(current)segments.push(current);
     const h=Math.max(66,segments.length*27+24);
-    if(y+h+435>H-165){nextPage();y=145;tableHeader()}
+    if(y+h+390>H-204){nextPage();y=145;tableHeader()}
     gridRow(y,h);label(String(i+1),left+12,y+32,17);segments.forEach((v,k)=>label(v,left+58,y+32+k*27,18));
     rightText(fmt(qty),col[3]-10,y+32,17);amountText(price,col[4]-10,y+32,16);amountText(taxable,col[5]-10,y+32,16);amountText(incl,right-10,y+32,17,true);y+=h;
   });
   // No decorative empty item rows: preserve space for totals, notes and footer.
   // Keep the Total label in its own cell, away from the numeric columns.
-  rect(left,y,contentW,40,'#d9dce2',null);rightText('Total',col[4]-12,y+28,18,true);amountText(subtotal,col[5]-10,y+28,17,true);amountText(total,right-10,y+28,17,true);y+=70;
-  if(y+385>H-165){nextPage();y=155}
+  rect(left,y,contentW,40,'#d9dce2',null);rightText('Total',col[4]-12,y+28,18,true);amountText(subtotal,col[5]-10,y+28,17,true);amountText(total,right-10,y+28,17,true);y+=50;
+  if(y+355>H-204){nextPage();y=155}
   const totalsX=535,totalsValX=right-4;
   // Reserve an independent right-aligned amount column so long bilingual
   // captions cannot run into SAR values. Shrink captions only when needed.
@@ -253,7 +253,7 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   fittedLabel(proforma?'Proforma Total / الإجمالي المبدئي:':'Invoice Total / إجمالي الفاتورة:',totalsX+8,y+140,amountColumnLeft-totalsX-22,21,true,'#fff');
   amountText(total,right-10,y+140,23,true,'#fff');
   rightText('('+moneyWords(total)+')',right,y+187,16,false,'#555');
-  y+=206;
+  y+=185;
   // Compact lower zone: signatory stays above notes, QR on the right.
   const lowerTop=y;
   // Keep QR location and 190 x 190 size unchanged. Notes start below its bottom edge.
@@ -265,34 +265,37 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
     ['Account No.',doc.bank_account_number],['IBAN No.',doc.bank_iban],
     ['SWIFT No.',doc.bank_swift]
   ].filter(([,value])=>clean(value));
-  const notesTop=invoice?lowerTop+235:lowerTop+16; // QR ends at lowerTop+215
   const notes=uniqueNotes(doc.notes||doc.remarks||doc.remark);
-  let cursor=notesTop;
-  const bottomLimit=H-216;
-  const ensureRoom=(height)=>{if(cursor+height>bottomLimit){nextPage();cursor=158;}};
+  const bottomLimit=H-220; // Keep content above the footer divider.
+  // Put short remarks beside the QR instead of unnecessarily pushing them below it.
+  // Longer remarks and bank details use the full-width area below the QR.
+  const notesBesideQr=invoice && !bankLines.length && notes.length>0 && notes.length<=180;
+  const notesX=left;
+  let notesWidth=notesBesideQr?(right-245-left):contentW;
+  let cursor=notesBesideQr?lowerTop+33:(invoice?lowerTop+226:lowerTop+16);
+  const ensureRoom=(height)=>{if(cursor+height>bottomLimit){nextPage();cursor=158;notesWidth=contentW;}};
   if(bankLines.length){
-    ensureRoom(39+bankLines.length*29);
+    ensureRoom(39+bankLines.length*27);
     label('Bank Details / التفاصيل البنكية',left,cursor,17,true);
-    cursor+=34;
+    cursor+=30;
     for(const [key,value] of bankLines){
-      ensureRoom(30);
+      ensureRoom(27);
       label(key+': '+short(value,100),left,cursor,16);
-      cursor+=29;
+      cursor+=27;
     }
-    cursor+=14;
+    cursor+=10;
   }
   if(notes){
-    ensureRoom(68);
-    label('Remarks / Notes / ملاحظات',left,cursor,17,true);
-    cursor+=28;
-    // Wrap notes in the available width; paginate if content exceeds the footer zone.
+    ensureRoom(55);
+    label('Remarks / Notes / ملاحظات',notesX,cursor,17,true);
+    cursor+=27;
     const noteWords=clean(notes).split(/\s+/);
     let lineText='';
-    const flush=()=>{if(!lineText)return;ensureRoom(25);label(lineText,left,cursor,16);cursor+=25;lineText='';};
+    const flush=()=>{if(!lineText)return;ensureRoom(24);label(lineText,notesX,cursor,16);cursor+=24;lineText='';};
     for(const word of noteWords){
       const candidate=lineText?lineText+' '+word:word;
       ctx.font=font(16);
-      if(ctx.measureText(candidate).width>contentW && lineText)flush();
+      if(ctx.measureText(candidate).width>notesWidth && lineText)flush();
       lineText=lineText?lineText+' '+word:word;
     }
     flush();
