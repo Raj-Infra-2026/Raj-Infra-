@@ -341,6 +341,8 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
         reference: editing?.reference || '', 
         reference_number: editing?.po_number || editing?.reference_number || '', 
         notes: editing?.notes || '',
+        buyer_phone: editing?.buyer_phone || '',
+        buyer_id: editing?.buyer_id || '',
         bank_name: editing?.bank_name || '',
         bank_account_name: editing?.bank_account_name || '',
         bank_account_number: editing?.bank_account_number || '',
@@ -461,13 +463,13 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
         setBusy(true); 
         try {
             const payload = editing 
-                ? { notes: form.notes, items: form.items, status: form.status, ...(invoice ? {bank_name:form.bank_name,bank_account_name:form.bank_account_name,bank_account_number:form.bank_account_number,bank_iban:form.bank_iban,bank_swift:form.bank_swift} : {}), ...(kind === 'DeliveryNotes' ? { delivery_instructions: form.delivery_instructions } : {}) } 
+                ? { notes: form.notes, items: form.items, status: form.status, ...(invoice ? {buyer_phone:form.buyer_phone,buyer_id:form.buyer_id,bank_name:form.bank_name,bank_account_name:form.bank_account_name,bank_account_number:form.bank_account_number,bank_iban:form.bank_iban,bank_swift:form.bank_swift} : {}), ...(kind === 'DeliveryNotes' ? { delivery_instructions: form.delivery_instructions } : {}) } 
                 : { ...previewRecord() };
             const path = '/records/' + kind + (editing ? '/' + encodeURIComponent(editing.id) : '');
             const d = await request(path, { method: editing ? 'PATCH' : 'POST', body: JSON.stringify(payload) });
             
             try { 
-                await downloadDocumentPdf({ ...d.record, ...(invoice ? {bank_name:form.bank_name,bank_account_name:form.bank_account_name,bank_account_number:form.bank_account_number,bank_iban:form.bank_iban,bank_swift:form.bank_swift} : {}), seller_name_ar: d.record.seller_name_ar || company?.name_ar || '', seller_address: d.record.seller_address || [company?.address,company?.district,company?.city,company?.postal_code].filter(Boolean).join(', '), buyer_address: d.record.buyer_address || clientList.find(x=>x.id===d.record.client_id)?.address || '', company_logo: d.record.company_logo || company?.logo_data || '' }, kind, kind === 'Invoices' ? invoiceQrMarkup(d.record) : '', 'issued'); 
+                await downloadDocumentPdf({ ...d.record, ...(invoice ? {buyer_phone:form.buyer_phone,buyer_id:form.buyer_id,bank_name:form.bank_name,bank_account_name:form.bank_account_name,bank_account_number:form.bank_account_number,bank_iban:form.bank_iban,bank_swift:form.bank_swift} : {}), seller_name_ar: d.record.seller_name_ar || company?.name_ar || '', seller_address: d.record.seller_address || [company?.address,company?.district,company?.city,company?.postal_code].filter(Boolean).join(', '), buyer_address: d.record.buyer_address || clientList.find(x=>x.id===d.record.client_id)?.address || '', company_logo: d.record.company_logo || company?.logo_data || '' }, kind, kind === 'Invoices' ? invoiceQrMarkup(d.record) : '', 'issued'); 
             } catch(downloadError) { 
                 window.alert('Record submitted, but PDF download failed: ' + downloadError.message); 
                 await onSaved(); 
@@ -523,6 +525,13 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
                     {form.client_id && <p className="field-hint">{clientList.find(x => x.id === form.client_id)?.address || 'No address saved'} · VAT: {clientList.find(x => x.id === form.client_id)?.vat_number || 'Not supplied'}</p>}
                 </div>
 
+                {invoice && <div className="business-section">
+                    <div className="section-title"><h3>Additional Customer Details (optional)</h3></div>
+                    <div className="form-grid">
+                        <label>Mobile (optional)<input type="tel" maxLength={40} placeholder="Enter mobile number" value={form.buyer_phone || ''} onChange={e => set('buyer_phone', e.target.value.replace(/[^+0-9 ()-]/g, ''))}/></label>
+                        <label>ID (optional)<input type="text" maxLength={100} placeholder="Enter general-purpose ID" value={form.buyer_id || ''} onChange={e => set('buyer_id', e.target.value)}/></label>
+                    </div>
+                </div>}
                 <div className="business-section">
                     <h3>Document Details</h3>
                     <div className="form-grid">

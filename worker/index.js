@@ -354,6 +354,11 @@ function cleanSpecial(table, b, r) {
     for (const k of ['seller_name', 'seller_address', 'seller_vat', 'seller_cr', 'seller_phone', 'seller_email', 'buyer_name', 'buyer_address', 'buyer_vat', 'reference_number', 'sender_name', 'sender_address', 'sender_vat', 'sender_cr', 'sender_phone', 'sender_email', 'receiver_name', 'receiver_address', 'receiver_vat', 'receiver_signature', 'receiver_date', 'delivery_instructions'])
         copy(k, 600);
     if (['Invoices', 'ProformaInvoices'].includes(table)) {
+        for (const key of ['buyer_phone', 'buyer_id']) {
+            if (Object.prototype.hasOwnProperty.call(b, key))
+                r[key] = String(b[key] ?? '').trim().slice(0, key === 'buyer_phone' ? 40 : 100);
+        }
+
         if (Object.prototype.hasOwnProperty.call(b, 'items')) {
             if (!Array.isArray(b.items) || !b.items.length || b.items.length > 100)
                 throw Error('Invoice requires 1–100 line items');

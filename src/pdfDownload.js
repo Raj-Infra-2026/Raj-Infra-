@@ -159,28 +159,43 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   // Company address appears in footer only; never duplicate it in the top-left header.
   if(logo){const scale=Math.min(270/logo.width,180/logo.height);ctx.save();ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(logo,(W-logo.width*scale)/2,52,logo.width*scale,logo.height*scale);ctx.restore()}
   if(doc.seller_name_ar||doc.company_name_ar)arabicRight(short(doc.seller_name_ar||doc.company_name_ar,70),right,100,21,true);
-  const arabicIndicDigits = (value) => String(value ?? '').replace(/[0-9]/g, digit => '٠١٢٣٤٥٦٧٨٩'[Number(digit)]);
+  const arabicIndicDigits = value => String(value ?? '').replace(/[0-9]/g, digit => '٠١٢٣٤٥٦٧٨٩'[Number(digit)]);
   if(doc.seller_cr)arabicRight('السجل التجاري: '+arabicIndicDigits(doc.seller_cr),right,133,16);
   if(doc.seller_vat)arabicRight('الرقم الضريبي: '+arabicIndicDigits(doc.seller_vat),right,163,16);
-  label(heading,W/2,250,41,true,INK,'center');
-  if(arabic)label(arabic,W/2,292,27,true,INK,'center',true);
+  label(heading,W/2,250,invoice||proforma?41*1.20:41,true,INK,'center');
+  if(arabic)label(arabic,W/2,292,invoice||proforma?27*1.20:27,true,INK,'center',true);
   if(draft){ctx.save();ctx.strokeStyle='#c52222';ctx.lineWidth=4;ctx.strokeRect(right-170,274,164,44);label('PREVIEW',right-157,303,25,true,'#c52222');ctx.restore()}
   // Two-column reference-style metadata, not three shaded boxes.
   const metaY=draft?373:343;
   label('Customer / العميل',left,metaY,18,true);
   label(short(doc.buyer_name||doc.receiver_name||doc.name||'—',57),left,metaY+30,19);
-  if(doc.buyer_phone||doc.receiver_phone)label('Mobile: '+(doc.buyer_phone||doc.receiver_phone),left,metaY+56,16);
-  if(doc.buyer_id||doc.client_id)label('ID / رقم التعريفي: '+(doc.buyer_id||doc.client_id),left,metaY+80,16);
-  if(doc.buyer_vat)label('Customer VAT / الرقم الضريبي للعميل: '+doc.buyer_vat,left,metaY+105,15);
+  // Optional customer fields occupy space only when populated.
+  let customerY=metaY+56;
+  if(doc.buyer_phone||doc.receiver_phone){
+    label('Mobile: '+(doc.buyer_phone||doc.receiver_phone),left,customerY,16);
+    customerY+=26;
+  }
+  if(doc.buyer_id){
+    label('ID: '+doc.buyer_id,left,customerY,16);
+    customerY+=26;
+  }
+  if(doc.buyer_vat){
+    label('Customer VAT / الرقم الضريبي للعميل: '+doc.buyer_vat,left,customerY,15);
+    customerY+=26;
+  }
   const buyerAddress=clean(doc.buyer_address||doc.receiver_address||doc.client_address);
-  if(buyerAddress){label('Customer Address / عنوان العميل:',left,metaY+130,15,true);wrapText(buyerAddress,left,metaY+153,600,15,false,COLORS.gray,20,2)}
+  if(buyerAddress){
+    label('Customer Address / عنوان العميل:',left,customerY,15,true);
+    customerY+=23;
+    customerY=wrapText(buyerAddress,left,customerY,600,15,false,COLORS.gray,20,2);
+  }
   const mx=720;
   label('Invoice No. / رقم الفاتورة',mx,metaY,17,true);
   rightText(doc.reference||'Pending',right,metaY,18);
   label('Date / التاريخ',mx,metaY+33,17,true);
   rightText(pdfDate(doc.date)+(doc.invoice_time?' '+doc.invoice_time:''),right,metaY+33,17);
   if(doc.po_number||doc.reference_number){label('PO Number / رقم أمر الشراء',mx,metaY+66,16,true);rightText(short(doc.po_number||doc.reference_number,23),right,metaY+66,17)}
-  y=metaY+(buyerAddress?202:145);
+  y=Math.max(metaY+116,customerY+22);
   // Item grid uses reference's blue bilingual header and full-width column rules.
   const col=[left,left+42,left+628,left+725,left+860,left+990,right];
   const gridRow=(yy,height,fill='#fff')=>{rect(left,yy,contentW,height,fill,'#c9c9c9');ctx.strokeStyle='#d3d3d3';ctx.lineWidth=1;for(const x of col.slice(1,-1)){ctx.beginPath();ctx.moveTo(x,yy);ctx.lineTo(x,yy+height);ctx.stroke()}};
