@@ -1,4 +1,3 @@
-import { matchesSearch } from './searchUtils.js';
 import { downloadDocumentPdf, previewDocumentPdf } from './pdfDownload.js';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, Search, X, Save, Eye, Trash2, Download, FileText } from 'lucide-react';
@@ -251,13 +250,22 @@ export function CompanySettingsPage({ request, onChanged }) {
         const url = URL.createObjectURL(file);
         const image = new Image();
         try { await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=reject;image.src=url}); } finally { URL.revokeObjectURL(url); }
+        // Preserve enough source pixels for a sharp printed PDF. The previous
+        // 110px/0.78 conversion permanently destroyed logo detail.
         const canvas = document.createElement('canvas');
-        const scale = Math.min(1, 110/Math.max(image.width, image.height));
+        const scale = Math.min(1, 1400/Math.max(image.width, image.height));
         canvas.width = Math.max(1, Math.round(image.width*scale));
         canvas.height = Math.max(1, Math.round(image.height*scale));
-        canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
-        const data = canvas.toDataURL('image/webp', 0.78);
-        if(data.length > 45000) throw Error('Logo is too large after resizing.');
+        const context=canvas.getContext('2d');
+        context.imageSmoothingEnabled=true;
+        context.imageSmoothingQuality='high';
+        context.drawImage(image,0,0,canvas.width,canvas.height);
+        let data='';
+        for(const quality of [0.96,0.90,0.82,0.72]){
+          data=canvas.toDataURL('image/webp',quality);
+          if(data.length<=350000)break;
+        }
+        if(data.length>350000)throw Error('Logo is too detailed for Company Settings. Upload a clean transparent PNG with a smaller file size.');
         setProfile(old => ({...old, logo_data: data}));
         setError('');
       } catch(e) { setError('Could not process logo: ' + e.message); }
@@ -304,14 +312,6 @@ export function CompanySettingsPage({ request, onChanged }) {
                     </label>
                 )}
             </div>
-            <div className="company-profile-fields" style={{marginTop:24}}>
-                <div className="profile-wide"><h3>Invoice Number Settings</h3><p>Set the format for future invoices. Existing invoice numbers remain unchanged.</p></div>
-                <label><span>Company Prefix</span><input maxLength={12} required pattern="[A-Za-z0-9]{1,12}" value={profile.invoice_prefix ?? 'AP'} onChange={e=>setProfile(v=>({...v,invoice_prefix:e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'')}))}/></label>
-                <label><span>Document Identifier</span><input maxLength={12} required pattern="[A-Za-z0-9]{1,12}" value={profile.invoice_identifier ?? 'INV'} onChange={e=>setProfile(v=>({...v,invoice_identifier:e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'')}))}/></label>
-                <label><span>Starting Sequence Number</span><input type="number" min="1" step="1" max="999999999999" required value={profile.invoice_start_number ?? '1'} onChange={e=>setProfile(v=>({...v,invoice_start_number:e.target.value}))}/></label>
-                <label><span>Include Current Year</span><select value={profile.invoice_include_year ?? 'true'} onChange={e=>setProfile(v=>({...v,invoice_include_year:e.target.value}))}><option value="true">Yes</option><option value="false">No</option></select></label>
-                <div className="profile-wide"><strong>Example: {(profile.invoice_prefix || 'AP')}-{(profile.invoice_identifier || 'INV')}-{(profile.invoice_include_year ?? 'true') !== 'false' ? new Date().getFullYear() + '-' : ''}{String(Math.max(1,Number(profile.invoice_start_number)||1)).padStart(4,'0')}</strong><p>Numbers continue automatically beyond 9999 and across years. A higher starting number will not reset an existing sequence.</p></div>
-            </div>
             {error && <div className="notice error" role="alert">{error}</div>}
             {message && <div className="notice" role="status">{message}</div>}
             <div className="company-profile-footer">
@@ -322,7 +322,7 @@ export function CompanySettingsPage({ request, onChanged }) {
     );
 }
 
-const emptyLine = () => ({ description: '', quantity: 1, unit_price: '', unit: 'PCS', remarks: '' });
+const emptyLine = () => ({ description: '', quantity: 1, unit_price: 0, unit: 'PCS', remarks: '' });
 
 export function DocumentModal({ kind, editing, clients, role, request, onSaved, close, ClientForm }) {
     const invoice = ['Invoices', 'ProformaInvoices'].includes(kind); 
@@ -336,9 +336,9 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
         notes: editing?.notes || '', 
         date: editing?.date || saudiToday(), 
         invoice_time: editing?.invoice_time || editing?.invoice_timestamp?.slice(11,16) || saudiTime(), 
-        status: editing?.status || 'Active',
-        paid_amount: editing?.paid_amount ?? '', 
-        seller_name: editing?.seller_name || '', 
+        status: editing?.status || 'Active', 
+        seller_name: editing?.seller_name || '',
+        seller_name_ar: editing?.seller_name_ar || '', 
         seller_address: editing?.seller_address || '', 
         seller_vat: editing?.seller_vat || '', 
         seller_cr: editing?.seller_cr || '', 
@@ -373,7 +373,6 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
     const [company, setCompany] = useState(null);
     const [showCompanySettings, setShowCompanySettings] = useState(false);
     const [companySaving, setCompanySaving] = useState(false);
-    const [clientSearch, setClientSearch] = useState('');
     const [clientList, setClientList] = useState(clients);
     const [clientPopup, setClientPopup] = useState(false);
     const [busy, setBusy] = useState(false);
@@ -389,6 +388,7 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
             setForm(current => ({
                 ...current,
                 seller_name: current.seller_name || profile.name_en || '',
+                seller_name_ar: current.seller_name_ar || profile.name_ar || '',
                 seller_vat: current.seller_vat || profile.vat_number || '',
                 seller_cr: current.seller_cr || profile.cr_number || '',
                 seller_address: current.seller_address || [profile.address, profile.district, profile.city, profile.postal_code].filter(Boolean).join(', '),
@@ -410,6 +410,7 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
             setForm(current => ({
                 ...current,
                 seller_name: profile.name_en,
+                seller_name_ar: profile.name_ar || '',
                 seller_vat: profile.vat_number,
                 seller_cr: profile.cr_number,
                 seller_address: [profile.address, profile.district, profile.city, profile.postal_code].filter(Boolean).join(', '),
@@ -430,10 +431,7 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
     const setLine = (i, k, v) => setForm(f => ({ ...f, items: f.items.map((x, j) => j === i ? { ...x, [k]: v } : x) }));
     const chooseClient = id => { const c = clientList.find(x => x.id === id); setForm(f => ({ ...f, client_id: id, name: c?.name || '', buyer_name: c?.name || '', buyer_address: c?.address || '', buyer_vat: c?.vat_number || '', receiver_name: c?.name || '', receiver_address: c?.address || '', receiver_vat: c?.vat_number || '' })); };
     const totals = useMemo(() => invoiceTotals(form.items, form.adjustments), [form.items, form.adjustments]);
-    const paymentNote = form.status === 'Partially Paid' ? `Amount paid: ${sar(Number(form.paid_amount || 0))}. Pending balance: ${sar(Math.max(0, num(totals.total - Number(form.paid_amount || 0))))}.` : '';
-    const userNotes = (form.notes || '').replace(/(?:\n|^)(?:Amount paid: SAR [\d,.]+\. Pending balance: SAR [\d,.]+\.)/g, '').trim();
-    const finalNotes = [userNotes, paymentNote].filter(Boolean).join('\n');
-    const previewRecord = () => ({ ...form, notes: finalNotes, company_logo: form.company_logo || company?.logo_data || '', po_number: form.reference_number || form.po_number || '', reference: form.reference || '', buyer_name: form.buyer_name || form.name, buyer_address: form.buyer_address || clientList.find(x => x.id === form.client_id)?.address || '', buyer_vat: form.buyer_vat || clientList.find(x => x.id === form.client_id)?.vat_number || '', receiver_address: form.receiver_address || clientList.find(x => x.id === form.client_id)?.address || '', receiver_vat: form.receiver_vat || clientList.find(x => x.id === form.client_id)?.vat_number || '', subtotal: totals.subtotal, vat_amount: totals.vat, amount: totals.total });
+    const previewRecord = () => ({ ...form, seller_name_ar: form.seller_name_ar || company?.name_ar || '', seller_address: form.seller_address || [company?.address,company?.district,company?.city,company?.postal_code].filter(Boolean).join(', '), company_logo: form.company_logo || company?.logo_data || '', po_number: form.reference_number || form.po_number || '', reference: form.reference || '', buyer_name: form.buyer_name || form.name, buyer_address: form.buyer_address || clientList.find(x => x.id === form.client_id)?.address || '', buyer_vat: form.buyer_vat || clientList.find(x => x.id === form.client_id)?.vat_number || '', receiver_address: form.receiver_address || clientList.find(x => x.id === form.client_id)?.address || '', receiver_vat: form.receiver_vat || clientList.find(x => x.id === form.client_id)?.vat_number || '', subtotal: totals.subtotal, vat_amount: totals.vat, amount: totals.total });
 
     async function persist() { 
         setError(''); 
@@ -446,20 +444,18 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
             setError('Select a valid invoice date and time (Saudi Arabia).');
             return;
         } 
-        if (invoice && form.status === 'Partially Paid' && (form.paid_amount === '' || !Number.isFinite(Number(form.paid_amount)) || Number(form.paid_amount) <= 0 || Number(form.paid_amount) >= totals.total)) { setError('Enter a paid amount greater than zero and less than the invoice total.'); return; }
-        if (invoice && form.items.some(x => String(x.unit_price).trim() === '')) { setError('Enter a rate for every invoice item.'); return; }
         if (invoice && !String(form.seller_name||'').trim()) { setError('Enter the seller company name'); return; } 
         
         setBusy(true); 
         try {
             const payload = editing 
-                ? { notes: userNotes, paid_amount: form.paid_amount, items: form.items, status: form.status, ...(kind === 'DeliveryNotes' ? { delivery_instructions: form.delivery_instructions } : {}) } 
+                ? { notes: form.notes, items: form.items, status: form.status, ...(kind === 'DeliveryNotes' ? { delivery_instructions: form.delivery_instructions } : {}) } 
                 : { ...previewRecord() };
             const path = '/records/' + kind + (editing ? '/' + encodeURIComponent(editing.id) : '');
             const d = await request(path, { method: editing ? 'PATCH' : 'POST', body: JSON.stringify(payload) });
             
             try { 
-                await downloadDocumentPdf({ ...d.record, company_logo: d.record.company_logo || company?.logo_data || '' }, kind, kind === 'Invoices' ? invoiceQrMarkup(d.record) : '', 'submitted'); 
+                await downloadDocumentPdf({ ...d.record, seller_name_ar: d.record.seller_name_ar || company?.name_ar || '', seller_address: d.record.seller_address || [company?.address,company?.district,company?.city,company?.postal_code].filter(Boolean).join(', '), buyer_address: d.record.buyer_address || clientList.find(x=>x.id===d.record.client_id)?.address || '', company_logo: d.record.company_logo || company?.logo_data || '' }, kind, kind === 'Invoices' ? invoiceQrMarkup(d.record) : '', 'issued'); 
             } catch(downloadError) { 
                 window.alert('Record submitted, but PDF download failed: ' + downloadError.message); 
                 await onSaved(); 
@@ -494,7 +490,7 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
         <div className={"record-modal business-modal " + (invoice ? "invoice-redesign" : "delivery-modal")} role="dialog" aria-modal="true" aria-label={invoice ? 'Invoice builder' : 'Delivery note builder'}>
             <div className="modal-header">
                 <div>
-                    <span className="overline">ALIF SYNC / {proforma ? 'PROFORMA BUILDER' : invoice ? 'INVOICE BUILDER' : 'DELIVERY NOTE BUILDER'}</span>
+                    <span className="overline">ALIF LABS / {proforma ? 'PROFORMA BUILDER' : invoice ? 'INVOICE BUILDER' : 'DELIVERY NOTE BUILDER'}</span>
                     <h2>{editing ? 'Edit ' : 'New '}{proforma ? 'Proforma Invoice' : invoice ? 'Invoice' : 'Delivery Note'}</h2>
                 </div>
                 <button type="button" className="icon-btn" onClick={close}><X /></button>
@@ -506,13 +502,10 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
                         <h3>Client / Receiver</h3>
                         <button type="button" className="secondary" onClick={() => setClientPopup(true)}><Plus size={16}/> Create New Client</button>
                     </div>
-                    <label>Search Clients / البحث عن العملاء
-                        <input type="search" dir="auto" value={clientSearch} onChange={e => setClientSearch(e.target.value)} placeholder="Search Arabic, English, or any language" />
-                    </label>
                     <label>Select Existing Client
                         <select required value={form.client_id} onChange={e => chooseClient(e.target.value)}>
                             <option value="">Select a client</option>
-                            {clientList.filter(c => c.id === form.client_id || matchesSearch([c.name,c.name_ar,c.name_en,c.email,c.phone,c.vat_number,c.address].join(' '),clientSearch)).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            {clientList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                         </select>
                     </label>
                     {form.client_id && <p className="field-hint">{clientList.find(x => x.id === form.client_id)?.address || 'No address saved'} · VAT: {clientList.find(x => x.id === form.client_id)?.vat_number || 'Not supplied'}</p>}
@@ -535,7 +528,6 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
                                 ))}
                             </select>
                         </label>
-                        {invoice && form.status === 'Partially Paid' && <label>Amount Paid (SAR)<input type="number" min="0.01" step="0.01" required value={form.paid_amount} onChange={e => set('paid_amount', e.target.value)} placeholder="Enter amount paid"/><small>Pending balance: {sar(Math.max(0, num(totals.total - Number(form.paid_amount || 0))))}</small></label>}
                     </div>
                 </div>
 
@@ -665,14 +657,6 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
                             </label>
                         ))}
                     </div>
-                    <h4>Invoice Number Settings</h4>
-                    <div className="company-settings-grid">
-                        <label>Company Prefix<input maxLength={12} value={company?.invoice_prefix ?? 'AP'} onChange={e=>setCompany(v=>({...v,invoice_prefix:e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'')}))}/></label>
-                        <label>Invoice Identifier<input maxLength={12} value={company?.invoice_identifier ?? 'INV'} onChange={e=>setCompany(v=>({...v,invoice_identifier:e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'')}))}/></label>
-                        <label>Starting Number<input type="number" min="1" step="1" value={company?.invoice_start_number ?? '1'} onChange={e=>setCompany(v=>({...v,invoice_start_number:e.target.value}))}/></label>
-                        <label>Include Year<select value={company?.invoice_include_year ?? 'true'} onChange={e=>setCompany(v=>({...v,invoice_include_year:e.target.value}))}><option value="true">Yes</option><option value="false">No</option></select></label>
-                    </div>
-                    <p>Example: {(company?.invoice_prefix || 'AP')}-{(company?.invoice_identifier || 'INV')}-{(company?.invoice_include_year ?? 'true') !== 'false' ? new Date().getFullYear() + '-' : ''}{String(Math.max(1,Number(company?.invoice_start_number)||1)).padStart(4,'0')}</p>
                     <div className="company-settings-actions">
                         <button type="button" className="secondary" onClick={() => setShowCompanySettings(false)}>Cancel</button>
                         <button type="button" className="primary" disabled={companySaving || !company?.cr_number || !/^\d{15}$/.test(company?.vat_number || '')} onClick={saveCompanySettings}>

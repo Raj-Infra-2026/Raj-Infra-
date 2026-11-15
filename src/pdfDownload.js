@@ -3,7 +3,14 @@
  * Do not use a browser-generated demo QR as evidence of ZATCA Phase 2 acceptance.
  */
 const pdfDate = value => { const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(value||''));return m?`${m[3]}/${m[2]}/${m[1]}`:(value||'—'); };
-const SAR = n=>'SAR '+Number(n||0).toLocaleString('en-SA',{minimumFractionDigits:2,maximumFractionDigits:2});
+const RIYAL='\u20c1'; // Official Saudi Riyal sign (Unicode U+20C1), never U+FDFC.
+// Official SAMA symbol geometry. Draw as vector paths on the high-DPI PDF canvas,
+// rather than depending on a browser font having recently added Unicode U+20C1.
+const RIYAL_PATHS=[
+  'M699.62,1113.02h0c-20.06,44.48-33.32,92.75-38.4,143.37l424.51-90.24c20.06-44.47,33.31-92.75,38.4-143.37l-424.51,90.24Z',
+  'M1085.73,895.8c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.33v-135.2l292.27-62.11c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.27V66.13c-50.67,28.45-95.67,66.32-132.25,110.99v403.35l-132.25,28.11V0c-50.67,28.44-95.67,66.32-132.25,110.99v525.69l-295.91,62.88c-20.06,44.47-33.33,92.75-38.42,143.37l334.33-71.05v170.26l-358.3,76.14c-20.06,44.47-33.32,92.75-38.4,143.37l375.04-79.7c30.53-6.35,56.77-24.4,73.83-49.24l68.78-101.97v-.02c7.14-10.55,11.3-23.27,11.3-36.97v-149.98l132.25-28.11v270.4l424.53-90.28Z'
+];
+const SAR = n=>RIYAL+' '+Number(n||0).toLocaleString('en-SA',{minimumFractionDigits:2,maximumFractionDigits:2});
 const round = n=>Math.round((Number(n)||0)*100)/100;
 const clean = v=>String(v??'').trim();
 // Avoid repeating automatically generated payment summaries when a saved invoice
@@ -46,7 +53,7 @@ function makePdf(images){
 }
 const COLORS={ink:'#171717',gray:'#555555',muted:'#777777',rule:'#d9d9d9',light:'#f5f5f5',brand:'#3763a3',warn:'#8a3b28'};
 const W=1240,H=1754,margin=64,right=W-margin;
-const RENDER_SCALE=2; // 2480 x 3508 lossless pixels, sharp at A4 print size
+const RENDER_SCALE=3; // 3720 x 5262 (~450 DPI), lossless A4 rendering
 async function loadImage(src){
   if(!src)return null;
   const img=new Image();
@@ -64,12 +71,40 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   const vat=round(doc.vat_amount??subtotal*.15), adjustments=(doc.adjustments||[]).map(a=>({...a, signed:['Deduction','Retention'].includes(a.type)?-Math.abs(Number(a.amount||0)):Number(a.amount||0)}));
   const total=round(doc.amount??subtotal+vat+adjustments.reduce((n,a)=>n+a.signed,0));
   let logo=null,qr=null;
-  if(/^data:image\/(?:png|jpeg|webp);base64,/.test(doc.company_logo||'')){try{logo=await loadImage(doc.company_logo)}catch{/* logo optional */}}
+  if(/^data:image\/(?:png|jpeg|webp|svg\+xml);(?:base64,|charset=utf-8,)/.test(doc.company_logo||'')){try{logo=await loadImage(doc.company_logo)}catch{/* logo optional */}}
   if(invoice && qrMarkup){try{qr=await loadImage('data:image/svg+xml;charset=utf-8,'+encodeURIComponent(qrMarkup))}catch(e){throw Error('Invoice QR could not render in the PDF: '+e.message)}}
   const imagePages=[];let ctx,y,page=0;
-  const font=(size=20,bold=false,arabic=false)=>`${bold?'700 ':'400 '}${size}px ${arabic?'"Noto Naskh Arabic",Tahoma,Arial':'Arial,"Noto Sans Arabic",sans-serif'}`;
+  const font=(size=20,bold=false,arabic=false)=>`${bold?'700 ':'400 '}${size}px ${arabic?'"Noto Naskh Arabic",Tahoma,Arial':'"Noto Sans Arabic","Segoe UI Symbol",Arial,sans-serif'}`;
   const label=(text,x,yy,size=17,bold=false,color=COLORS.ink,align='left',ar=false)=>{
     ctx.save();ctx.fillStyle=color;ctx.font=font(size,bold,ar);ctx.textAlign=align;ctx.textBaseline='alphabetic';ctx.direction=ar?'rtl':'ltr';ctx.fillText(clean(text),x,yy);ctx.restore();
+  };
+  // Currency is drawn with the official symbol paths, so no OS/font fallback box.
+  const drawRiyal=(x,baseline,size,color=COLORS.ink)=>{
+    const symbolHeight=size*0.94, symbolWidth=symbolHeight*(1124.14/1256.39);
+    ctx.save();ctx.translate(x,baseline-symbolHeight*0.86);ctx.scale(symbolWidth/1124.14,symbolHeight/1256.39);
+    ctx.fillStyle=color;for(const d of RIYAL_PATHS)ctx.fill(new Path2D(d));ctx.restore();
+    return symbolWidth;
+  };
+  const amountText=(n,x,baseline,size=17,bold=false,color=COLORS.ink)=>{
+    const value=Number(n||0).toLocaleString('en-SA',{minimumFractionDigits:2,maximumFractionDigits:2});
+    ctx.save();ctx.font=font(size,bold);const width=ctx.measureText(value).width;ctx.restore();
+    const glyphW=size*0.94*(1124.14/1256.39),gap=7;
+    const textStart=x-width;label(value,textStart,baseline,size,bold,color,'left');
+    drawRiyal(textStart-gap-glyphW,baseline,size,color);
+  };
+  const arabicRight=(value,x,baseline,size=17,bold=false,color=COLORS.ink)=>
+    label(value,x,baseline,size,bold,color,'right',true);
+  // Footer lines are centered and wrapped independently so longer registered
+  // addresses stay within the A4 margins.
+  const footerWrap=(value,baseline,size)=>{
+    const content=clean(value);if(!content)return;
+    ctx.save();ctx.font=font(size,false);const chunks=[];let current='';
+    for(const word of content.split(/\s+/)){
+      const next=current?current+' '+word:word;
+      if(ctx.measureText(next).width>W-margin*2 && current){chunks.push(current);current=word}else current=next;
+    }
+    if(current)chunks.push(current);ctx.restore();
+    chunks.slice(0,2).forEach((part,i)=>label(part,W/2,baseline+i*(size+3),size,false,COLORS.gray,'center'));
   };
   function wrapText(str,x,yy,maxWidth,size=20,bold=false,color=COLORS.ink,lineH=size+8,maxLines=100){
     ctx.font=font(size,bold);let count=0;
@@ -89,8 +124,8 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   function basePage(){
     const canvas=document.createElement('canvas');canvas.width=W*RENDER_SCALE;canvas.height=H*RENDER_SCALE;ctx=canvas.getContext('2d',{alpha:false,willReadFrequently:true});ctx.setTransform(RENDER_SCALE,0,0,RENDER_SCALE,0,0);ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);
     page++;ctx.fillStyle='#c92828';ctx.fillRect(margin,H-118,W-margin*2,3);
-    label(doc.seller_address||'',W/2,H-91,19,false,COLORS.gray,'center');
-    label([doc.seller_email,doc.seller_website].filter(Boolean).join('  |  '),W/2,H-64,19,false,COLORS.gray,'center');
+    footerWrap(doc.seller_address||doc.sender_address||doc.company_address||'',H-102,23);
+    label([doc.seller_email,doc.seller_website].filter(Boolean).join('  |  '),W/2,H-48,19,false,COLORS.gray,'center');
     label(`Page ${page}`,right,H-38,13,false,COLORS.gray,'right');
     y=140;
     return canvas;
@@ -113,31 +148,36 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   const left=margin, contentW=right-margin;
   const rightText=(t,x,yy,size=17,bold=false,color=INK)=>label(t,x,yy,size,bold,color,'right');
   const short=(s,n=70)=>clean(s).slice(0,n);
-  const heading=invoice?'Tax Invoice - فاتورة ضريبية':proforma?'Proforma Invoice - الفاتورة الأولية':title+(arabic?' - '+arabic:'');
+  const heading=title;
   // Company identity — same positions as the reference page.
   label(short(doc.seller_name||doc.sender_name||'Company',42),left,100,22,true);
   if(doc.seller_cr)label('C.R.: '+doc.seller_cr,left,133,16);
   if(doc.seller_vat)label('VAT: '+doc.seller_vat,left,163,16);
-  if(logo){const scale=Math.min(270/logo.width,180/logo.height);ctx.drawImage(logo,(W-logo.width*scale)/2,52,logo.width*scale,logo.height*scale)}
-  if(doc.seller_name_ar||doc.company_name_ar)rightText(short(doc.seller_name_ar||doc.company_name_ar,45),right,100,21,true);
-  if(doc.seller_cr)rightText('س.ت.: '+doc.seller_cr,right,133,16);
-  if(doc.seller_vat)rightText('الرقم الضريبي: '+doc.seller_vat,right,163,16);
-  label(heading,W/2,260,43,true,INK,'center');
+  const sellerAddress=clean(doc.seller_address||doc.sender_address||doc.company_address);
+  if(sellerAddress)wrapText(sellerAddress,left,188,410,15,false,COLORS.gray,19,2);
+  if(logo){const scale=Math.min(270/logo.width,180/logo.height);ctx.save();ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(logo,(W-logo.width*scale)/2,52,logo.width*scale,logo.height*scale);ctx.restore()}
+  if(doc.seller_name_ar||doc.company_name_ar)arabicRight(short(doc.seller_name_ar||doc.company_name_ar,70),right,100,21,true);
+  if(doc.seller_cr)arabicRight('السجل التجاري: '+doc.seller_cr,right,133,16);
+  if(doc.seller_vat)arabicRight('الرقم الضريبي: '+doc.seller_vat,right,163,16);
+  label(heading,W/2,250,41,true,INK,'center');
+  if(arabic)label(arabic,W/2,292,27,true,INK,'center',true);
   if(draft){ctx.save();ctx.strokeStyle='#c52222';ctx.lineWidth=4;ctx.strokeRect(right-170,274,164,44);label('PREVIEW',right-157,303,25,true,'#c52222');ctx.restore()}
   // Two-column reference-style metadata, not three shaded boxes.
-  const metaY=draft?343:313;
+  const metaY=draft?373:343;
   label('Customer / العميل',left,metaY,18,true);
   label(short(doc.buyer_name||doc.receiver_name||doc.name||'—',57),left,metaY+30,19);
   if(doc.buyer_phone||doc.receiver_phone)label('Mobile: '+(doc.buyer_phone||doc.receiver_phone),left,metaY+56,16);
   if(doc.buyer_id||doc.client_id)label('ID / رقم التعريفي: '+(doc.buyer_id||doc.client_id),left,metaY+80,16);
   if(doc.buyer_vat)label('Customer VAT / الرقم الضريبي للعميل: '+doc.buyer_vat,left,metaY+105,15);
+  const buyerAddress=clean(doc.buyer_address||doc.receiver_address||doc.client_address);
+  if(buyerAddress){label('Customer Address / عنوان العميل:',left,metaY+130,15,true);wrapText(buyerAddress,left,metaY+153,600,15,false,COLORS.gray,20,2)}
   const mx=720;
   label('Invoice No. / رقم الفاتورة',mx,metaY,17,true);
   rightText(doc.reference||'Pending',right,metaY,18);
   label('Date / التاريخ',mx,metaY+33,17,true);
   rightText(pdfDate(doc.date)+(doc.invoice_time?' '+doc.invoice_time:''),right,metaY+33,17);
   if(doc.po_number||doc.reference_number){label('PO Number / رقم أمر الشراء',mx,metaY+66,16,true);rightText(short(doc.po_number||doc.reference_number,23),right,metaY+66,17)}
-  y=metaY+145;
+  y=metaY+(buyerAddress?202:145);
   // Item grid uses reference's blue bilingual header and full-width column rules.
   const col=[left,left+42,left+628,left+725,left+860,left+990,right];
   const gridRow=(yy,height,fill='#fff')=>{rect(left,yy,contentW,height,fill,'#c9c9c9');ctx.strokeStyle='#d3d3d3';ctx.lineWidth=1;for(const x of col.slice(1,-1)){ctx.beginPath();ctx.moveTo(x,yy);ctx.lineTo(x,yy+height);ctx.stroke()}};
@@ -150,20 +190,21 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   }
   tableHeader();
   const fmt=n=>Number(n||0).toLocaleString('en-SA',{minimumFractionDigits:2,maximumFractionDigits:2});
+  // Monetary columns use amountText() so the true 2025 symbol cannot be missing.
   items.forEach((item,i)=>{
     const qty=Number(item.quantity||0),price=Number(item.unit_price||0),taxable=round(qty*price),incl=round(taxable*1.15);
     const desc=clean(item.description||'Item');ctx.font=font(18);let words=desc.split(/\s+/),segments=[],current='';for(const word of words){const v=current?current+' '+word:word;if(ctx.measureText(v).width>550&&current){segments.push(current);current=word}else current=v}if(current)segments.push(current);
     const h=Math.max(66,segments.length*27+24);
-    if(y+h+380>1600){nextPage();y=145;tableHeader()}
+    if(y+h+630>1550){nextPage();y=145;tableHeader()}
     gridRow(y,h);label(String(i+1),left+12,y+32,17);segments.forEach((v,k)=>label(v,left+58,y+32+k*27,18));
-    rightText(fmt(qty),col[3]-10,y+32,17);rightText(fmt(price),col[4]-10,y+32,16);rightText(fmt(taxable),col[5]-10,y+32,16);rightText(fmt(incl),right-10,y+32,17,true);y+=h;
+    rightText(fmt(qty),col[3]-10,y+32,17);amountText(price,col[4]-10,y+32,16);amountText(taxable,col[5]-10,y+32,16);amountText(incl,right-10,y+32,17,true);y+=h;
   });
   // Reference leaves several blank ruled item lines when space permits.
   const blankCount=Math.min(3,Math.max(0,Math.floor((920-y)/55)));
   for(let i=0;i<blankCount;i++){gridRow(y,55);y+=55}
   // Keep the Total label in its own cell, away from the numeric columns.
-  rect(left,y,contentW,40,'#d9dce2',null);rightText('Total',col[4]-12,y+28,18,true);rightText(fmt(subtotal),col[5]-10,y+28,17,true);rightText(fmt(total),right-10,y+28,17,true);y+=70;
-  if(y+520>1600){nextPage();y=155}
+  rect(left,y,contentW,40,'#d9dce2',null);rightText('Total',col[4]-12,y+28,18,true);amountText(subtotal,col[5]-10,y+28,17,true);amountText(total,right-10,y+28,17,true);y+=70;
+  if(y+620>1580){nextPage();y=155}
   const totalsX=535,totalsValX=right-4;
   // Reserve an independent right-aligned amount column so long bilingual
   // captions cannot run into SAR values. Shrink captions only when needed.
@@ -175,7 +216,7 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   };
   const summary=(caption,val,yy,bold=false)=>{
     fittedLabel(caption,totalsX,yy,amountColumnLeft-totalsX-18,17,bold);
-    rightText('SAR '+fmt(val),totalsValX,yy,18,bold);
+    amountText(val,totalsValX,yy,18,bold);
   };
   summary('Taxable Amount / المبلغ الخاضع للضريبة:',subtotal,y);
   summary('Total VAT (15%) / إجمالي الضريبة:',vat,y+38);
@@ -183,16 +224,16 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   // Signature area intentionally blank: never fabricate a real signature or stamp.
   label('Authorized Signatory',left+30,y+64,18,true);
   rect(totalsX-5,y+103,right-totalsX+5,57,BLUE,null);
-  fittedLabel('Invoice Total / إجمالي الفاتورة:',totalsX+8,y+140,amountColumnLeft-totalsX-22,21,true,'#fff');
-  rightText('SAR '+fmt(total),right-10,y+140,23,true,'#fff');
+  fittedLabel(proforma?'Proforma Total / الإجمالي المبدئي:':'Invoice Total / إجمالي الفاتورة:',totalsX+8,y+140,amountColumnLeft-totalsX-22,21,true,'#fff');
+  amountText(total,right-10,y+140,23,true,'#fff');
   rightText('('+moneyWords(total)+')',right,y+187,16,false,'#555');
   y+=228;
   // Place the scannable QR under the summary, on the right, as annotated.
-  if(invoice){const qx=right-235;label('QR Code / رمز الاستجابة السريعة',qx,y+20,18,true);if(qr){ctx.fillStyle='#fff';ctx.fillRect(qx,y+30,220,220);ctx.drawImage(qr,qx,y+30,220,220)}else{rect(qx,y+32,220,200,'#fff8f5','#e4bcad');wrapText('QR unavailable',qx+12,y+65,185,17,true,COLORS.warn)}y+=270}
+  const notes=uniqueNotes(doc.notes||doc.remarks||doc.remark);
+  if(notes){label('Remarks / Notes / ملاحظات',left,y+20,17,true);wrapText(notes,left,y+53,Math.max(340,contentW-300),16,false,COLORS.ink,24,7)}
+  if(invoice){const qx=right-235;label('QR Code / رمز الاستجابة السريعة',qx,y+20,18,true);if(qr){ctx.fillStyle='#fff';ctx.fillRect(qx,y+30,220,220);ctx.drawImage(qr,qx,y+30,220,220)}else{rect(qx,y+32,220,200,'#fff8f5','#e4bcad');wrapText('QR unavailable',qx+12,y+65,185,17,true,COLORS.warn)}y+=270}else if(notes){y+=240}
   const bankLines=[['Bank Name',doc.bank_name],['A/c Name',doc.bank_account_name],['Account No.',doc.bank_account_number],['IBAN No.',doc.iban||doc.bank_iban],['SWIFT No.',doc.swift||doc.bank_swift]].filter(([k,v])=>clean(v));
   if(bankLines.length){if(y+bankLines.length*24+100>1620){nextPage();y=150}label('Bank Details',left,y+24,18,true);y+=54;for(const [k,v] of bankLines){label(k+': '+v,left,y,16);y+=24}y+=18}
-  const notes=uniqueNotes(doc.notes);
-  if(notes){if(y+95>1620){nextPage();y=155}label('Notes / ملاحظات',left,y+22,17,true);y=wrapText(notes,left,y+51,contentW,16,false,COLORS.ink,23,6)+20}
   // Compact Code128-style barcode is intentionally omitted rather than inventing
   // an invalid barcode. Existing QR remains scannable.
   capture();
