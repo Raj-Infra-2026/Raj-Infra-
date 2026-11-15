@@ -125,10 +125,20 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
     const canvas=document.createElement('canvas');canvas.width=W*RENDER_SCALE;canvas.height=H*RENDER_SCALE;ctx=canvas.getContext('2d',{alpha:false,willReadFrequently:true});ctx.setTransform(RENDER_SCALE,0,0,RENDER_SCALE,0,0);ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);
     page++;
     // Footer is a separate fixed zone: divider, address and contact never overlap.
-    ctx.fillStyle='#c92828';ctx.fillRect(margin,H-158,W-margin*2,3);
-    footerWrap(doc.seller_address||doc.sender_address||doc.company_address||'',H-125,23);
-    label([doc.seller_email,doc.seller_website].filter(Boolean).join('  |  '),W/2,H-42,19,false,COLORS.gray,'center');
-    label(`Page ${page}`,right,H-38,13,false,COLORS.gray,'right');
+    ctx.fillStyle='#c92828';ctx.fillRect(margin,H-204,W-margin*2,3);
+    // Company identity in both languages, then address and optional contact details.
+    const footerName=clean(doc.seller_name||doc.sender_name||doc.company_name);
+    const footerArabicName=clean(doc.seller_name_ar||doc.company_name_ar);
+    const footerEmail=clean(doc.seller_email||doc.company_email);
+    const footerWebsite=clean(doc.seller_website||doc.company_website);
+    const contactLine=[footerEmail&&'Email: '+footerEmail,footerWebsite&&'Website: '+footerWebsite].filter(Boolean).join('  |  ');
+    let footerY=H-178;
+    if(footerName){footerWrap(footerName,footerY,20);footerY+=26;}
+    if(footerArabicName){label(footerArabicName,W/2,footerY,20,true,COLORS.ink,'center',true);footerY+=26;}
+    const footerAddress=clean(doc.seller_address||doc.sender_address||doc.company_address);
+    if(footerAddress){footerWrap(footerAddress,footerY,19);footerY+=50;}
+    if(contactLine)footerWrap(contactLine,Math.min(footerY,H-40),17);
+    label(`Page ${page}`,right,H-27,13,false,COLORS.gray,'right');
     y=140;
     return canvas;
   }
@@ -258,7 +268,7 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   const notesTop=invoice?lowerTop+235:lowerTop+16; // QR ends at lowerTop+215
   const notes=uniqueNotes(doc.notes||doc.remarks||doc.remark);
   let cursor=notesTop;
-  const bottomLimit=H-170;
+  const bottomLimit=H-216;
   const ensureRoom=(height)=>{if(cursor+height>bottomLimit){nextPage();cursor=158;}};
   if(bankLines.length){
     ensureRoom(39+bankLines.length*29);
