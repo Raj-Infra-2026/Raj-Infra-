@@ -333,7 +333,12 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
         name: editing?.name || '', 
         reference: editing?.reference || '', 
         reference_number: editing?.po_number || editing?.reference_number || '', 
-        notes: editing?.notes || '', 
+        notes: editing?.notes || '',
+        bank_name: editing?.bank_name || '',
+        bank_account_name: editing?.bank_account_name || '',
+        bank_account_number: editing?.bank_account_number || '',
+        bank_iban: editing?.bank_iban || '',
+        bank_swift: editing?.bank_swift || '', 
         date: editing?.date || saudiToday(), 
         invoice_time: editing?.invoice_time || editing?.invoice_timestamp?.slice(11,16) || saudiTime(), 
         status: editing?.status || 'Active', 
@@ -449,13 +454,13 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
         setBusy(true); 
         try {
             const payload = editing 
-                ? { notes: form.notes, items: form.items, status: form.status, ...(kind === 'DeliveryNotes' ? { delivery_instructions: form.delivery_instructions } : {}) } 
+                ? { notes: form.notes, items: form.items, status: form.status, ...(invoice ? {bank_name:form.bank_name,bank_account_name:form.bank_account_name,bank_account_number:form.bank_account_number,bank_iban:form.bank_iban,bank_swift:form.bank_swift} : {}), ...(kind === 'DeliveryNotes' ? { delivery_instructions: form.delivery_instructions } : {}) } 
                 : { ...previewRecord() };
             const path = '/records/' + kind + (editing ? '/' + encodeURIComponent(editing.id) : '');
             const d = await request(path, { method: editing ? 'PATCH' : 'POST', body: JSON.stringify(payload) });
             
             try { 
-                await downloadDocumentPdf({ ...d.record, seller_name_ar: d.record.seller_name_ar || company?.name_ar || '', seller_address: d.record.seller_address || [company?.address,company?.district,company?.city,company?.postal_code].filter(Boolean).join(', '), buyer_address: d.record.buyer_address || clientList.find(x=>x.id===d.record.client_id)?.address || '', company_logo: d.record.company_logo || company?.logo_data || '' }, kind, kind === 'Invoices' ? invoiceQrMarkup(d.record) : '', 'issued'); 
+                await downloadDocumentPdf({ ...d.record, ...(invoice ? {bank_name:form.bank_name,bank_account_name:form.bank_account_name,bank_account_number:form.bank_account_number,bank_iban:form.bank_iban,bank_swift:form.bank_swift} : {}), seller_name_ar: d.record.seller_name_ar || company?.name_ar || '', seller_address: d.record.seller_address || [company?.address,company?.district,company?.city,company?.postal_code].filter(Boolean).join(', '), buyer_address: d.record.buyer_address || clientList.find(x=>x.id===d.record.client_id)?.address || '', company_logo: d.record.company_logo || company?.logo_data || '' }, kind, kind === 'Invoices' ? invoiceQrMarkup(d.record) : '', 'issued'); 
             } catch(downloadError) { 
                 window.alert('Record submitted, but PDF download failed: ' + downloadError.message); 
                 await onSaved(); 
@@ -620,6 +625,16 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
                     </div>
                 )}
 
+                {invoice && <div className="business-section">
+                    <div className="section-title"><h3>Bank Details (optional, for this invoice only)</h3></div>
+                    <div className="form-grid">
+                        {input('bank_name', 'Bank Name')}
+                        {input('bank_account_name', 'Account Name')}
+                        {input('bank_account_number', 'Account Number')}
+                        {input('bank_iban', 'IBAN')}
+                        {input('bank_swift', 'SWIFT Code')}
+                    </div>
+                </div>}
                 <div className="business-section">
                     <label className="invoice-notes-field">Notes (optional)
                         <textarea rows={3} maxLength={3000} placeholder="Additional information to display on the invoice PDF" value={form.notes || ''} onChange={e => set('notes', capitalizeStart(e.target.value))}/>

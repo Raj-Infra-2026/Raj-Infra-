@@ -74,7 +74,7 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   if(/^data:image\/(?:png|jpeg|webp|svg\+xml);(?:base64,|charset=utf-8,)/.test(doc.company_logo||'')){try{logo=await loadImage(doc.company_logo)}catch{/* logo optional */}}
   if(invoice && qrMarkup){try{qr=await loadImage('data:image/svg+xml;charset=utf-8,'+encodeURIComponent(qrMarkup))}catch(e){throw Error('Invoice QR could not render in the PDF: '+e.message)}}
   const imagePages=[];let ctx,y,page=0;
-  const font=(size=20,bold=false,arabic=false)=>`${bold?'700 ':'400 '}${size}px ${arabic?'"Noto Naskh Arabic",Tahoma,Arial':'"Noto Sans Arabic","Segoe UI Symbol",Arial,sans-serif'}`;
+  const font=(size=20,bold=false,arabic=false)=>`${bold?'700 ':'400 '}${(size*1.10).toFixed(2)}px ${arabic?'"Noto Naskh Arabic",Tahoma,Arial':'"Noto Sans Arabic","Segoe UI Symbol",Arial,sans-serif'}`;
   const label=(text,x,yy,size=17,bold=false,color=COLORS.ink,align='left',ar=false)=>{
     ctx.save();ctx.fillStyle=color;ctx.font=font(size,bold,ar);ctx.textAlign=align;ctx.textBaseline='alphabetic';ctx.direction=ar?'rtl':'ltr';ctx.fillText(clean(text),x,yy);ctx.restore();
   };
@@ -156,7 +156,7 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   if(doc.seller_cr)label('C.R.: '+doc.seller_cr,left,133,16);
   if(doc.seller_vat)label('VAT: '+doc.seller_vat,left,163,16);
   const sellerAddress=clean(doc.seller_address||doc.sender_address||doc.company_address);
-  if(sellerAddress)wrapText(sellerAddress,left,188,410,15,false,COLORS.gray,19,2);
+  // Company address appears in footer only; never duplicate it in the top-left header.
   if(logo){const scale=Math.min(270/logo.width,180/logo.height);ctx.save();ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(logo,(W-logo.width*scale)/2,52,logo.width*scale,logo.height*scale);ctx.restore()}
   if(doc.seller_name_ar||doc.company_name_ar)arabicRight(short(doc.seller_name_ar||doc.company_name_ar,70),right,100,21,true);
   if(doc.seller_cr)arabicRight('السجل التجاري: '+doc.seller_cr,right,133,16);
@@ -229,20 +229,49 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   rightText('('+moneyWords(total)+')',right,y+187,16,false,'#555');
   y+=206;
   // Compact lower zone: signatory stays above notes, QR on the right.
-  const notes=uniqueNotes(doc.notes||doc.remarks||doc.remark);
   const lowerTop=y;
   // Keep QR location and 190 x 190 size unchanged. Notes start below its bottom edge.
   if(invoice){const qx=right-210;label('QR Code / رمز الاستجابة السريعة',qx,lowerTop+16,16,true);if(qr){ctx.fillStyle='#fff';ctx.fillRect(qx,lowerTop+25,190,190);ctx.drawImage(qr,qx,lowerTop+25,190,190)}else{rect(qx,lowerTop+25,190,170,'#fff8f5','#e4bcad');wrapText('QR unavailable',qx+12,lowerTop+58,165,16,true,COLORS.warn)}}
-  const notesTop=invoice?lowerTop+235:lowerTop+16; // QR ends at lowerTop + 215
-  let notesEnd=notesTop;
-  if(notes){
-    // A new page is preferable to covering the fixed footer on long invoices.
-    if(notesTop+66>H-165){nextPage();notesEnd=166;label('Remarks / Notes / ملاحظات',left,notesEnd,17,true);notesEnd=wrapText(notes,left,notesEnd+28,contentW,16,false,COLORS.ink,23,5)}
-    else {label('Remarks / Notes / ملاحظات',left,notesTop,17,true);notesEnd=wrapText(notes,left,notesTop+28,contentW,16,false,COLORS.ink,23,5)}
+  // Optional bank details are per-document only, never prefilled or hardcoded.
+  // They appear below the QR and immediately above remarks, in both preview and final.
+  const bankLines=[
+    ['Bank Name',doc.bank_name],['A/c Name',doc.bank_account_name],
+    ['Account No.',doc.bank_account_number],['IBAN No.',doc.bank_iban],
+    ['SWIFT No.',doc.bank_swift]
+  ].filter(([,value])=>clean(value));
+  const notesTop=invoice?lowerTop+235:lowerTop+16; // QR ends at lowerTop+215
+  const notes=uniqueNotes(doc.notes||doc.remarks||doc.remark);
+  let cursor=notesTop;
+  const bottomLimit=H-170;
+  const ensureRoom=(height)=>{if(cursor+height>bottomLimit){nextPage();cursor=158;}};
+  if(bankLines.length){
+    ensureRoom(39+bankLines.length*29);
+    label('Bank Details / التفاصيل البنكية',left,cursor,17,true);
+    cursor+=34;
+    for(const [key,value] of bankLines){
+      ensureRoom(30);
+      label(key+': '+short(value,100),left,cursor,16);
+      cursor+=29;
+    }
+    cursor+=14;
   }
-  y=notes?notesEnd+16:(invoice?lowerTop+225:lowerTop+20);
-  const bankLines=[['Bank Name',doc.bank_name],['A/c Name',doc.bank_account_name],['Account No.',doc.bank_account_number],['IBAN No.',doc.iban||doc.bank_iban],['SWIFT No.',doc.swift||doc.bank_swift]].filter(([k,v])=>clean(v));
-  if(bankLines.length){if(y+bankLines.length*24+75>H-165){nextPage();y=150}label('Bank Details',left,y+24,18,true);y+=54;for(const [k,v] of bankLines){label(k+': '+v,left,y,16);y+=24}y+=18}
+  if(notes){
+    ensureRoom(68);
+    label('Remarks / Notes / ملاحظات',left,cursor,17,true);
+    cursor+=28;
+    // Wrap notes in the available width; paginate if content exceeds the footer zone.
+    const noteWords=clean(notes).split(/\s+/);
+    let lineText='';
+    const flush=()=>{if(!lineText)return;ensureRoom(25);label(lineText,left,cursor,16);cursor+=25;lineText='';};
+    for(const word of noteWords){
+      const candidate=lineText?lineText+' '+word:word;
+      ctx.font=font(16);
+      if(ctx.measureText(candidate).width>contentW && lineText)flush();
+      lineText=lineText?lineText+' '+word:word;
+    }
+    flush();
+  }
+  y=cursor+12;
   // Compact Code128-style barcode is intentionally omitted rather than inventing
   // an invalid barcode. Existing QR remains scannable.
   capture();
