@@ -14,3 +14,8 @@ run_worker_first = ["/api/*"]
 # Set to the exact production URL. For local dev, add http://localhost:5173 if needed.
 # Update ALLOWED_ORIGIN to actual ALIF LABS domain before production deployment
 ALLOWED_ORIGIN = "http://localhost:5173"
+
+# Create the R2 bucket in Cloudflare before deploying.
+[[r2_buckets]]
+binding = "LOGO_BUCKET"
+bucket_name = "alif-sync-logos"
