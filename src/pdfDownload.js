@@ -172,7 +172,7 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   const arabicIndicDigits = value => String(value ?? '').replace(/[0-9]/g, digit => '٠١٢٣٤٥٦٧٨٩'[Number(digit)]);
   if(doc.seller_cr)arabicRight('السجل التجاري: '+arabicIndicDigits(doc.seller_cr),right,133,16);
   if(doc.seller_vat)arabicRight('الرقم الضريبي: '+arabicIndicDigits(doc.seller_vat),right,163,16);
-  label(heading,W/2,247,invoice||proforma?41*1.20*0.95:41,true,INK,'center');
+  label(heading,W/2,247,invoice||proforma?41*1.20*0.80:41,true,INK,'center');
   if(arabic)label(arabic,W/2,293,invoice||proforma?27*1.20*0.95:27,true,INK,'center',true);
   if(draft){ctx.save();ctx.strokeStyle='#c52222';ctx.lineWidth=4;ctx.strokeRect(right-170,274,164,44);label('PREVIEW',right-157,303,25,true,'#c52222');ctx.restore()}
   // Two-column reference-style metadata, not three shaded boxes.
