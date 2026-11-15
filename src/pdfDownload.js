@@ -1,5 +1,5 @@
 /** ALIF SYNC V5.3 — A4 bilingual invoice render, shared by Preview and Download.
- * Uses a browser-rendered canvas PDF. A preview is NEVER an issued tax invoice.
+ * Uses a high-resolution lossless canvas PDF. A preview is NEVER an issued tax invoice.
  * Do not use a browser-generated demo QR as evidence of ZATCA Phase 2 acceptance.
  */
 const pdfDate = value => { const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(value||''));return m?`${m[3]}/${m[2]}/${m[1]}`:(value||'—'); };
@@ -25,27 +25,28 @@ const moneyWords = value => {
   const r=Math.floor(Number(value)||0),h=Math.round(((Number(value)||0)-r)*100);return (say(r)+' Saudi riyals'+(h?' and '+say(h)+' halalas':'')+' only').replace(/\b[a-z]/g, c => c.toUpperCase());
 };
 
-function makePdf(jpegs){
+function makePdf(images){
   const encoder=new TextEncoder(),parts=[];let len=0;const offsets=[];
   const push=b=>{const data=typeof b==='string'?encoder.encode(b):b;parts.push(data);len+=data.length};
   const obj=(id,data)=>{offsets[id]=len;push(`${id} 0 obj\n`);push(data);push('\nendobj\n')};
   push('%PDF-1.4\n');
   obj(1,'<< /Type /Catalog /Pages 2 0 R >>');
-  obj(2,`<< /Type /Pages /Kids [ ${jpegs.map((_,i)=>3+3*i+' 0 R').join(' ')} ] /Count ${jpegs.length} >>`);
-  jpegs.forEach((jpeg,i)=>{
+  obj(2,`<< /Type /Pages /Kids [ ${images.map((_,i)=>3+3*i+' 0 R').join(' ')} ] /Count ${images.length} >>`);
+  images.forEach((picture,i)=>{
     const p=3+i*3,img=p+1,stream=p+2;
     obj(p,`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /XObject << /I${i} ${img} 0 R >> >> /Contents ${stream} 0 R >>`);
-    offsets[img]=len;push(`${img} 0 obj\n<< /Type /XObject /Subtype /Image /Width 1240 /Height 1754 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.length} >>\nstream\n`);push(jpeg);push('\nendstream\nendobj\n');
+    offsets[img]=len;push(`${img} 0 obj\n<< /Type /XObject /Subtype /Image /Width ${picture.width} /Height ${picture.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length ${picture.data.length} >>\nstream\n`);push(picture.data);push('\nendstream\nendobj\n');
     const content=`q 595.28 0 0 841.89 0 0 cm /I${i} Do Q`;
     obj(stream,`<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
   });
-  const xref=len;push(`xref\n0 ${3+jpegs.length*3}\n0000000000 65535 f \n`);
-  for(let i=1;i<=jpegs.length*3+2;i++)push(`${String(offsets[i]).padStart(10,'0')} 00000 n \n`);
-  push(`trailer\n<< /Size ${3+jpegs.length*3} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`);
+  const xref=len;push(`xref\n0 ${3+images.length*3}\n0000000000 65535 f \n`);
+  for(let i=1;i<=images.length*3+2;i++)push(`${String(offsets[i]).padStart(10,'0')} 00000 n \n`);
+  push(`trailer\n<< /Size ${3+images.length*3} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`);
   return new Blob(parts,{type:'application/pdf'});
 }
 const COLORS={ink:'#171717',gray:'#555555',muted:'#777777',rule:'#d9d9d9',light:'#f5f5f5',brand:'#3763a3',warn:'#8a3b28'};
 const W=1240,H=1754,margin=64,right=W-margin;
+const RENDER_SCALE=2; // 2480 x 3508 lossless pixels, sharp at A4 print size
 async function loadImage(src){
   if(!src)return null;
   const img=new Image();
@@ -65,7 +66,7 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   let logo=null,qr=null;
   if(/^data:image\/(?:png|jpeg|webp);base64,/.test(doc.company_logo||'')){try{logo=await loadImage(doc.company_logo)}catch{/* logo optional */}}
   if(invoice && qrMarkup){try{qr=await loadImage('data:image/svg+xml;charset=utf-8,'+encodeURIComponent(qrMarkup))}catch(e){throw Error('Invoice QR could not render in the PDF: '+e.message)}}
-  const jpegPages=[];let ctx,y,page=0;
+  const imagePages=[];let ctx,y,page=0;
   const font=(size=20,bold=false,arabic=false)=>`${bold?'700 ':'400 '}${size}px ${arabic?'"Noto Naskh Arabic",Tahoma,Arial':'Arial,"Noto Sans Arabic",sans-serif'}`;
   const label=(text,x,yy,size=17,bold=false,color=COLORS.ink,align='left',ar=false)=>{
     ctx.save();ctx.fillStyle=color;ctx.font=font(size,bold,ar);ctx.textAlign=align;ctx.textBaseline='alphabetic';ctx.direction=ar?'rtl':'ltr';ctx.fillText(clean(text),x,yy);ctx.restore();
@@ -86,16 +87,25 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   function rect(x,yy,w,h,fill=COLORS.light,stroke=COLORS.rule){ctx.fillStyle=fill;ctx.fillRect(x,yy,w,h);if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1.5;ctx.strokeRect(x,yy,w,h)}}
   function line(x,yy,end){ctx.strokeStyle=COLORS.rule;ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(x,yy);ctx.lineTo(end,yy);ctx.stroke()}
   function basePage(){
-    const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;ctx=canvas.getContext('2d',{alpha:false});ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);
+    const canvas=document.createElement('canvas');canvas.width=W*RENDER_SCALE;canvas.height=H*RENDER_SCALE;ctx=canvas.getContext('2d',{alpha:false,willReadFrequently:true});ctx.setTransform(RENDER_SCALE,0,0,RENDER_SCALE,0,0);ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);
     page++;ctx.fillStyle='#c92828';ctx.fillRect(margin,H-118,W-margin*2,3);
-    label(doc.seller_address||'',W/2,H-91,15,false,COLORS.gray,'center');
-    label([doc.seller_email,doc.seller_website].filter(Boolean).join('  |  '),W/2,H-64,15,false,COLORS.gray,'center');
+    label(doc.seller_address||'',W/2,H-91,19,false,COLORS.gray,'center');
+    label([doc.seller_email,doc.seller_website].filter(Boolean).join('  |  '),W/2,H-64,19,false,COLORS.gray,'center');
     label(`Page ${page}`,right,H-38,13,false,COLORS.gray,'right');
     y=140;
     return canvas;
   }
   let canvas=basePage();
-  function capture(){const jpg=canvas.toDataURL('image/jpeg',0.97).split(',')[1],bin=atob(jpg),bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);jpegPages.push(bytes)}
+  function capture(){imagePages.push(canvas)}
+  async function compressPage(pageCanvas){
+    if(typeof CompressionStream==='undefined')throw Error('This browser does not support lossless PDF compression. Please use an updated Chrome or Edge.');
+    const {width,height}=pageCanvas;
+    const pixels=pageCanvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,width,height).data;
+    const rgb=new Uint8Array(width*height*3);
+    for(let src=0,dst=0;src<pixels.length;src+=4){rgb[dst++]=pixels[src];rgb[dst++]=pixels[src+1];rgb[dst++]=pixels[src+2]}
+    const compressed=await new Response(new Blob([rgb]).stream().pipeThrough(new CompressionStream('deflate'))).arrayBuffer();
+    return {width,height,data:new Uint8Array(compressed)};
+  }
   function nextPage(){capture();canvas=basePage();return canvas}
   // Faithful A4 reference layout: bilingual identity, centered logo, blue grid and total.
   // Seller identity appears ONLY in the header, never in a second seller panel.
@@ -108,11 +118,11 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   label(short(doc.seller_name||doc.sender_name||'Company',42),left,100,22,true);
   if(doc.seller_cr)label('C.R.: '+doc.seller_cr,left,133,16);
   if(doc.seller_vat)label('VAT: '+doc.seller_vat,left,163,16);
-  if(logo){const scale=Math.min(205/logo.width,150/logo.height);ctx.drawImage(logo,(W-logo.width*scale)/2,52,logo.width*scale,logo.height*scale)}
+  if(logo){const scale=Math.min(270/logo.width,180/logo.height);ctx.drawImage(logo,(W-logo.width*scale)/2,52,logo.width*scale,logo.height*scale)}
   if(doc.seller_name_ar||doc.company_name_ar)rightText(short(doc.seller_name_ar||doc.company_name_ar,45),right,100,21,true);
   if(doc.seller_cr)rightText('س.ت.: '+doc.seller_cr,right,133,16);
   if(doc.seller_vat)rightText('الرقم الضريبي: '+doc.seller_vat,right,163,16);
-  label(heading,W/2,260,39,true,INK,'center');
+  label(heading,W/2,260,43,true,INK,'center');
   if(draft){ctx.save();ctx.strokeStyle='#c52222';ctx.lineWidth=4;ctx.strokeRect(right-170,274,164,44);label('PREVIEW',right-157,303,25,true,'#c52222');ctx.restore()}
   // Two-column reference-style metadata, not three shaded boxes.
   const metaY=draft?343:313;
@@ -165,7 +175,7 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   };
   const summary=(caption,val,yy,bold=false)=>{
     fittedLabel(caption,totalsX,yy,amountColumnLeft-totalsX-18,17,bold);
-    rightText('﷼ '+fmt(val),totalsValX,yy,18,bold);
+    rightText('SAR '+fmt(val),totalsValX,yy,18,bold);
   };
   summary('Taxable Amount / المبلغ الخاضع للضريبة:',subtotal,y);
   summary('Total VAT (15%) / إجمالي الضريبة:',vat,y+38);
@@ -174,11 +184,11 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   label('Authorized Signatory',left+30,y+64,18,true);
   rect(totalsX-5,y+103,right-totalsX+5,57,BLUE,null);
   fittedLabel('Invoice Total / إجمالي الفاتورة:',totalsX+8,y+140,amountColumnLeft-totalsX-22,21,true,'#fff');
-  rightText('﷼ '+fmt(total),right-10,y+140,23,true,'#fff');
+  rightText('SAR '+fmt(total),right-10,y+140,23,true,'#fff');
   rightText('('+moneyWords(total)+')',right,y+187,16,false,'#555');
   y+=228;
-  // Preserve mandatory QR even though reference uses a 1D barcode.
-  if(invoice){label('QR Code / رمز الاستجابة السريعة',left,y+20,18,true);if(qr){ctx.fillStyle='#fff';ctx.fillRect(left,y+30,220,220);ctx.drawImage(qr,left,y+30,220,220)}else{rect(left,y+32,220,200,'#fff8f5','#e4bcad');wrapText('QR unavailable',left+12,y+65,185,17,true,COLORS.warn)}y+=270}
+  // Place the scannable QR under the summary, on the right, as annotated.
+  if(invoice){const qx=right-235;label('QR Code / رمز الاستجابة السريعة',qx,y+20,18,true);if(qr){ctx.fillStyle='#fff';ctx.fillRect(qx,y+30,220,220);ctx.drawImage(qr,qx,y+30,220,220)}else{rect(qx,y+32,220,200,'#fff8f5','#e4bcad');wrapText('QR unavailable',qx+12,y+65,185,17,true,COLORS.warn)}y+=270}
   const bankLines=[['Bank Name',doc.bank_name],['A/c Name',doc.bank_account_name],['Account No.',doc.bank_account_number],['IBAN No.',doc.iban||doc.bank_iban],['SWIFT No.',doc.swift||doc.bank_swift]].filter(([k,v])=>clean(v));
   if(bankLines.length){if(y+bankLines.length*24+100>1620){nextPage();y=150}label('Bank Details',left,y+24,18,true);y+=54;for(const [k,v] of bankLines){label(k+': '+v,left,y,16);y+=24}y+=18}
   const notes=uniqueNotes(doc.notes);
@@ -187,7 +197,7 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   // an invalid barcode. Existing QR remains scannable.
   capture();
   const base=clean(doc.reference||'DRAFT-'+(doc.date||'document')).replace(/[^a-z0-9_-]/gi,'_').slice(0,70);
-  return new File([makePdf(jpegPages)],(draft?'PREVIEW_':'')+base+'.pdf',{type:'application/pdf'});
+  return new File([makePdf(await Promise.all(imagePages.map(compressPage)))],(draft?'PREVIEW_':'')+base+'.pdf',{type:'application/pdf'});
 }
 export async function downloadDocumentPdf(doc,kind='Invoices',qrMarkup='',mode='preview'){
   const file=await createDocumentPdfFile(doc,kind,qrMarkup,mode);
