@@ -123,9 +123,11 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   function line(x,yy,end){ctx.strokeStyle=COLORS.rule;ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(x,yy);ctx.lineTo(end,yy);ctx.stroke()}
   function basePage(){
     const canvas=document.createElement('canvas');canvas.width=W*RENDER_SCALE;canvas.height=H*RENDER_SCALE;ctx=canvas.getContext('2d',{alpha:false,willReadFrequently:true});ctx.setTransform(RENDER_SCALE,0,0,RENDER_SCALE,0,0);ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);
-    page++;ctx.fillStyle='#c92828';ctx.fillRect(margin,H-118,W-margin*2,3);
-    footerWrap(doc.seller_address||doc.sender_address||doc.company_address||'',H-102,23);
-    label([doc.seller_email,doc.seller_website].filter(Boolean).join('  |  '),W/2,H-48,19,false,COLORS.gray,'center');
+    page++;
+    // Footer is a separate fixed zone: divider, address and contact never overlap.
+    ctx.fillStyle='#c92828';ctx.fillRect(margin,H-158,W-margin*2,3);
+    footerWrap(doc.seller_address||doc.sender_address||doc.company_address||'',H-125,23);
+    label([doc.seller_email,doc.seller_website].filter(Boolean).join('  |  '),W/2,H-42,19,false,COLORS.gray,'center');
     label(`Page ${page}`,right,H-38,13,false,COLORS.gray,'right');
     y=140;
     return canvas;
@@ -195,16 +197,14 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
     const qty=Number(item.quantity||0),price=Number(item.unit_price||0),taxable=round(qty*price),incl=round(taxable*1.15);
     const desc=clean(item.description||'Item');ctx.font=font(18);let words=desc.split(/\s+/),segments=[],current='';for(const word of words){const v=current?current+' '+word:word;if(ctx.measureText(v).width>550&&current){segments.push(current);current=word}else current=v}if(current)segments.push(current);
     const h=Math.max(66,segments.length*27+24);
-    if(y+h+630>1550){nextPage();y=145;tableHeader()}
+    if(y+h+435>H-165){nextPage();y=145;tableHeader()}
     gridRow(y,h);label(String(i+1),left+12,y+32,17);segments.forEach((v,k)=>label(v,left+58,y+32+k*27,18));
     rightText(fmt(qty),col[3]-10,y+32,17);amountText(price,col[4]-10,y+32,16);amountText(taxable,col[5]-10,y+32,16);amountText(incl,right-10,y+32,17,true);y+=h;
   });
-  // Reference leaves several blank ruled item lines when space permits.
-  const blankCount=Math.min(3,Math.max(0,Math.floor((920-y)/55)));
-  for(let i=0;i<blankCount;i++){gridRow(y,55);y+=55}
+  // No decorative empty item rows: preserve space for totals, notes and footer.
   // Keep the Total label in its own cell, away from the numeric columns.
   rect(left,y,contentW,40,'#d9dce2',null);rightText('Total',col[4]-12,y+28,18,true);amountText(subtotal,col[5]-10,y+28,17,true);amountText(total,right-10,y+28,17,true);y+=70;
-  if(y+620>1580){nextPage();y=155}
+  if(y+385>H-165){nextPage();y=155}
   const totalsX=535,totalsValX=right-4;
   // Reserve an independent right-aligned amount column so long bilingual
   // captions cannot run into SAR values. Shrink captions only when needed.
@@ -227,13 +227,15 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   fittedLabel(proforma?'Proforma Total / الإجمالي المبدئي:':'Invoice Total / إجمالي الفاتورة:',totalsX+8,y+140,amountColumnLeft-totalsX-22,21,true,'#fff');
   amountText(total,right-10,y+140,23,true,'#fff');
   rightText('('+moneyWords(total)+')',right,y+187,16,false,'#555');
-  y+=228;
-  // Place the scannable QR under the summary, on the right, as annotated.
+  y+=206;
+  // Compact lower zone: signatory stays above notes, QR on the right.
   const notes=uniqueNotes(doc.notes||doc.remarks||doc.remark);
-  if(notes){label('Remarks / Notes / ملاحظات',left,y+20,17,true);wrapText(notes,left,y+53,Math.max(340,contentW-300),16,false,COLORS.ink,24,7)}
-  if(invoice){const qx=right-235;label('QR Code / رمز الاستجابة السريعة',qx,y+20,18,true);if(qr){ctx.fillStyle='#fff';ctx.fillRect(qx,y+30,220,220);ctx.drawImage(qr,qx,y+30,220,220)}else{rect(qx,y+32,220,200,'#fff8f5','#e4bcad');wrapText('QR unavailable',qx+12,y+65,185,17,true,COLORS.warn)}y+=270}else if(notes){y+=240}
+  const lowerTop=y;
+  if(notes){label('Remarks / Notes / ملاحظات',left,lowerTop+16,17,true);wrapText(notes,left,lowerTop+44,Math.max(340,contentW-310),16,false,COLORS.ink,23,5)}
+  if(invoice){const qx=right-210;label('QR Code / رمز الاستجابة السريعة',qx,lowerTop+16,16,true);if(qr){ctx.fillStyle='#fff';ctx.fillRect(qx,lowerTop+25,190,190);ctx.drawImage(qr,qx,lowerTop+25,190,190)}else{rect(qx,lowerTop+25,190,170,'#fff8f5','#e4bcad');wrapText('QR unavailable',qx+12,lowerTop+58,165,16,true,COLORS.warn)}}
+  y=lowerTop+(invoice?225:notes?Math.min(160,65+notes.length/3):20);
   const bankLines=[['Bank Name',doc.bank_name],['A/c Name',doc.bank_account_name],['Account No.',doc.bank_account_number],['IBAN No.',doc.iban||doc.bank_iban],['SWIFT No.',doc.swift||doc.bank_swift]].filter(([k,v])=>clean(v));
-  if(bankLines.length){if(y+bankLines.length*24+100>1620){nextPage();y=150}label('Bank Details',left,y+24,18,true);y+=54;for(const [k,v] of bankLines){label(k+': '+v,left,y,16);y+=24}y+=18}
+  if(bankLines.length){if(y+bankLines.length*24+75>H-165){nextPage();y=150}label('Bank Details',left,y+24,18,true);y+=54;for(const [k,v] of bankLines){label(k+': '+v,left,y,16);y+=24}y+=18}
   // Compact Code128-style barcode is intentionally omitted rather than inventing
   // an invalid barcode. Existing QR remains scannable.
   capture();
