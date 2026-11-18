@@ -661,3 +661,21 @@
 @media(max-width:650px){.app-shell .alif-nav-lower{min-height:102px;padding-top:8px}.app-shell .alif-dock-nav{min-height:92px;gap:3px;padding:24px 5px 9px}.app-shell .alif-dock-item{height:52px;padding:6px 1px;gap:6px}.app-shell .alif-dock-item span{font-size:clamp(7px,1.8vw,10px)}.app-shell .alif-dock-item svg{width:18px;height:18px}}
 @media(pointer:coarse){.app-shell .alif-dock-item svg{transform:none!important}}
 @media(prefers-reduced-motion:reduce){.app-shell .alif-dock-item svg{transform:none!important;transition:none!important}}
+
+/* Client ERP compact document line editor: equal 40px controls and fixed column alignment */
+.app-shell .alif-dock-item.active{color:#000!important}
+.record-modal:has(.alif-lines-table){width:min(1180px,calc(100vw - 24px))}
+.alif-lines-scroll{overflow-x:auto;max-width:100%;margin:12px 0}
+.alif-lines-table{min-width:810px;display:flex;flex-direction:column;gap:5px}
+.alif-lines-head,.alif-lines-row{display:grid;grid-template-columns:minmax(210px,2.4fr) minmax(65px,.65fr) minmax(95px,1fr) minmax(110px,1.05fr) minmax(85px,.85fr) minmax(130px,1.3fr) 34px;gap:8px;align-items:center}
+.alif-lines-head{padding:0 0 5px;color:var(--muted);font-size:11px;font-weight:700}
+.alif-lines-row{padding:5px;border-radius:10px;background:var(--surface2)}
+.alif-lines-row input,.alif-lines-readonly,.alif-lines-amount,.alif-lines-remove{height:40px!important;min-height:40px;box-sizing:border-box;margin:0;align-self:center}
+.alif-lines-row input{min-width:0;width:100%;padding:0 9px!important;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--text);font-size:12px;line-height:40px}
+.alif-lines-row input:focus{outline:2px solid #17c8df;outline-offset:0}
+.alif-lines-readonly,.alif-lines-amount{display:flex;align-items:center;justify-content:flex-end;padding:0 9px;white-space:nowrap;font-variant-numeric:tabular-nums;font-size:12px;border:1px solid var(--line);border-radius:7px;color:var(--muted)}
+.alif-lines-amount{color:#087e9b;background:#d3f1f5;border-color:#a5e3eb;font-weight:700}
+[data-theme="dark"] .alif-lines-amount,.dark .alif-lines-amount{background:#153a44;color:#78e6f2;border-color:#276b7a}
+.alif-lines-remove{display:grid;place-items:center;border:0;background:transparent;color:var(--muted);padding:0;cursor:pointer}
+.alif-lines-remove:disabled{opacity:.25;cursor:default}
+@media(max-width:900px){.alif-lines-scroll{scrollbar-width:thin}}
