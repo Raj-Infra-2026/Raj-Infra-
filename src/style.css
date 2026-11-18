@@ -650,3 +650,14 @@
 @media(max-width:650px){.app-shell .alif-nav-header{padding:10px 8px 7px}.app-shell .alif-nav-email{display:none}.app-shell .alif-nav-tools{gap:1px}.app-shell .alif-nav-brand small{display:none}.app-shell .alif-nav-lower{min-height:104px}.app-shell .alif-dock-nav{gap:2px;padding:32px 5px 13px;width:100%}.app-shell .alif-dock-item{min-width:0;flex:1;height:48px;padding:6px 1px}.app-shell .alif-dock-item span{font-size:8px}.app-shell .alif-dock-item svg{width:18px;height:18px}.app-shell .alif-mega-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.app-shell .alif-mega-link{padding:10px 7px;font-size:11px}}
 @media(pointer:coarse){.app-shell .alif-dock-item{--dock-scale:1!important;transform:none!important}}
 @media(prefers-reduced-motion:reduce){.app-shell .alif-cyan-page,.app-shell .alif-mega-menu{animation:none!important}.app-shell .alif-dock-item{transform:none!important;transition:none!important}}
+
+/* Full-width navigation collision fix: each module keeps its own layout cell.
+   Only the icon magnifies, so button hit areas and labels never overlap. */
+.app-shell .alif-nav-lower{width:100%;min-height:128px;align-items:stretch;justify-content:stretch;padding-top:12px;overflow:visible}
+.app-shell .alif-dock-nav{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));align-items:end;justify-items:stretch;gap:clamp(8px,1.2vw,22px);width:100%;max-width:none;min-width:0;min-height:112px;padding:36px clamp(12px,2vw,36px) 12px;background:color-mix(in srgb,var(--surface) 23%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-color:color-mix(in srgb,var(--line) 42%,transparent);box-shadow:0 12px 30px #00000012;overflow:visible}
+.app-shell .alif-dock-item{min-width:0;width:100%;height:60px;padding:8px 4px;gap:7px;transform:none!important;transform-origin:center;z-index:auto!important;will-change:auto;transition:background .3s ease,border-color .3s ease,box-shadow .3s ease}
+.app-shell .alif-dock-item svg{width:21px;height:21px;flex-shrink:0;transform:translateY(calc((1 - var(--dock-scale))*7px)) scale(var(--dock-scale));transform-origin:center bottom;transition:transform .38s cubic-bezier(.22,1,.36,1);will-change:transform;pointer-events:none}
+.app-shell .alif-dock-item span{position:relative;font-size:clamp(10px,.85vw,13px);line-height:1.2;white-space:nowrap;pointer-events:none}
+@media(max-width:650px){.app-shell .alif-nav-lower{min-height:102px;padding-top:8px}.app-shell .alif-dock-nav{min-height:92px;gap:3px;padding:24px 5px 9px}.app-shell .alif-dock-item{height:52px;padding:6px 1px;gap:6px}.app-shell .alif-dock-item span{font-size:clamp(7px,1.8vw,10px)}.app-shell .alif-dock-item svg{width:18px;height:18px}}
+@media(pointer:coarse){.app-shell .alif-dock-item svg{transform:none!important}}
+@media(prefers-reduced-motion:reduce){.app-shell .alif-dock-item svg{transform:none!important;transition:none!important}}
