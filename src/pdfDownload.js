@@ -67,8 +67,9 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   const arabic=invoice?'فاتورة ضريبية':proforma?'فاتورة أولية':kind==='DeliveryNotes'?'إشعار تسليم':kind==='Quotations'?'عرض سعر':'';
   const draft=invoice && mode === 'preview';
   const items=Array.isArray(doc.items)?doc.items:[];
-  const subtotal=round(items.reduce((n,x)=>n+Number(x.quantity||0)*Number(x.unit_price||0),0));
-  const vat=round(doc.vat_amount??subtotal*.15), adjustments=(doc.adjustments||[]).map(a=>({...a, signed:['Deduction','Retention'].includes(a.type)?-Math.abs(Number(a.amount||0)):Number(a.amount||0)}));
+  const itemAmounts=items.map(x=>{const base=round(Number(x.quantity||0)*Number(x.unit_price||0));const discount=round(x.discount_type==='fixed'?Number(x.discount_value||0):base*Number(x.discount_value||0)/100);const taxable=round(base-discount);return {taxable,vat:round(taxable*Number(x.vat_rate??15)/100),total:round(taxable+round(taxable*Number(x.vat_rate??15)/100))}});
+  const subtotal=round(doc.subtotal??itemAmounts.reduce((n,x)=>n+x.taxable,0));
+  const vat=round(doc.vat_amount??itemAmounts.reduce((n,x)=>n+x.vat,0)), adjustments=(doc.adjustments||[]).map(a=>({...a, signed:['Deduction','Retention'].includes(a.type)?-Math.abs(Number(a.amount||0)):Number(a.amount||0)}));
   const total=round(doc.amount??subtotal+vat+adjustments.reduce((n,a)=>n+a.signed,0));
   let logo=null,qr=null;
   if(/^data:image\/(?:png|jpeg|webp|svg\+xml);(?:base64,|charset=utf-8,)/.test(doc.company_logo||'')){try{logo=await loadImage(doc.company_logo)}catch{/* logo optional */}}
@@ -341,7 +342,7 @@ export async function createDocumentPdfFile(doc,kind='Invoices',qrMarkup='',mode
   const fmt=n=>Number(n||0).toLocaleString('en-SA',{minimumFractionDigits:2,maximumFractionDigits:2});
   // Monetary columns use amountText() so the true 2025 symbol cannot be missing.
   items.forEach((item,i)=>{
-    const qty=Number(item.quantity||0),price=Number(item.unit_price||0),taxable=round(qty*price),incl=round(taxable*1.15);
+    const qty=Number(item.quantity||0),price=Number(item.unit_price||0),taxable=itemAmounts[i].taxable,incl=itemAmounts[i].total;
     const desc=clean(item.description||'Item');
     const maxDescWidth=col[2]-col[1]-22;
     ctx.font=font(17);

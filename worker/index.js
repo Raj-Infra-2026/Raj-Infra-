@@ -204,7 +204,8 @@ async function sheet(env, table, method = 'GET', range = 'A:I', body) {
 const COMPANY_FIELDS = [
     'name_en', 'name_ar', 'vat_number', 'cr_number', 'website', 'address',
     'city', 'district', 'postal_code', 'phone', 'email', 'logo_data', 'primary_color', 'secondary_color',
-    'invoice_prefix', 'invoice_identifier', 'invoice_include_year', 'invoice_start_number'
+    'invoice_prefix', 'invoice_identifier', 'invoice_include_year', 'invoice_start_number',
+    'bank_name', 'bank_account_name', 'bank_account_number', 'bank_iban', 'bank_swift'
 ];
 const COMPANY_HEADERS = ['field', 'value'];
 
@@ -283,7 +284,7 @@ function fromRow(r) { let extra = parseJSON(r[8] || '{}', {}); if (!extra || typ
 function toRow(r) { const { id, brand_id, reference, name, status, amount, date, updated_at, ...extra } = r; return [id || '', brand_id || '', reference || '', name || '', status || '', Number(amount) || 0, date || '', updated_at || new Date().toISOString(), JSON.stringify(extra)]; }
 async function records(env, table) { const r = await sheet(env, table); return (r.values || []).slice(1).map((cells, i) => ({ row: i + 2, ...fromRow(cells) })).filter(x => x.id && x.status !== 'Deleted'); }
 function visible(user, r) { return !!r.id && r.status !== 'Deleted'; }
-function clean(body, user, old) { const now = new Date().toISOString(); const fields = ['name', 'reference', 'status', 'amount', 'date', 'client_id', 'email', 'phone', 'address', 'vat_number', 'cr_number', 'project_location', 'same_as_office', 'po_number', 'reference_number', 'notes', 'due_date', 'items', 'discount', 'tax_rate', 'payment_terms', 'maps_url', 'invoice_time', 'invoice_timestamp', 'paid_amount', 'seller_name', 'seller_vat', 'seller_cr', 'seller_address', 'seller_phone', 'seller_email', 'buyer_name', 'buyer_vat', 'buyer_address', 'receiver_name', 'receiver_address', 'receiver_vat', 'subtotal', 'vat_amount', 'adjustments']; const r = { ...(old || {}) }; for (const f of fields)
+function clean(body, user, old) { const now = new Date().toISOString(); const fields = ['name', 'reference', 'status', 'amount', 'date', 'client_id', 'email', 'phone', 'address', 'vat_number', 'cr_number', 'project_location', 'same_as_office', 'client_type', 'po_number', 'reference_number', 'notes', 'due_date', 'items', 'discount', 'tax_rate', 'payment_terms', 'maps_url', 'invoice_time', 'invoice_timestamp', 'paid_amount', 'seller_name', 'seller_vat', 'seller_cr', 'seller_address', 'seller_phone', 'seller_email', 'buyer_name', 'buyer_vat', 'buyer_address', 'receiver_name', 'receiver_address', 'receiver_vat', 'subtotal', 'vat_amount', 'adjustments']; const r = { ...(old || {}) }; for (const f of fields)
     if (Object.prototype.hasOwnProperty.call(body, f))
         r[f] = body[f]; r.id = old?.id || crypto.randomUUID(); r.brand_id = old?.brand_id || ''; r.created_by = old?.created_by || user.username; r.created_at = old?.created_at || now; r.updated_at = now; r.name = String(r.name || '').trim().slice(0, 250); r.reference = String(r.reference || '').trim().slice(0, 80); r.status = String(r.status || 'Active').slice(0, 40); r.date = String(r.date || now.slice(0, 10)).slice(0, 10); r.amount = Number(r.amount || 0); if (!Number.isFinite(r.amount) || r.amount < 0 || r.amount > 1e12)
     throw Error('Invalid amount'); if (!r.name)
@@ -299,7 +300,7 @@ function clean(body, user, old) { const now = new Date().toISOString(); const fi
     r.amount = Math.round(((subtotal - discount) * (1 + tax / 100) + Number.EPSILON) * 100) / 100;
 } return r; }
 function titleClient(s) { return String(s || '').replace(/(^|[\s\-'])\p{L}/gu, m => m.toLocaleUpperCase()); }
-function validateClient(b) { const email = String(b.email || '').trim(); if (email && !/^[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?(?:\.[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?)+$/i.test(email) || (email && (email.includes('..') || email.length > 254)))
+function validateClient(b) { if (b.client_type && !['Regular', 'One-Time'].includes(b.client_type)) throw Error('Invalid client type'); const email = String(b.email || '').trim(); if (email && !/^[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?(?:\.[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?)+$/i.test(email) || (email && (email.includes('..') || email.length > 254)))
     throw Error('Invalid client email address'); const phone = String(b.phone || '').replace(/[\s()-]/g, ''); if (phone && !/^\+[1-9]\d{6,14}$/.test(phone))
     throw Error('Invalid client phone number'); if (!['Active', 'Inactive'].includes(b.status || 'Active'))
     throw Error('Invalid client status'); if (b.maps_url && !/^https:\/\/(www\.)?(google\.[a-z.]+\/maps|maps\.google\.[a-z.]+|maps\.app\.goo\.gl\/)/i.test(String(b.maps_url)))
@@ -354,7 +355,7 @@ function cleanSpecial(table, b, r) {
     for (const k of ['seller_name', 'seller_address', 'seller_vat', 'seller_cr', 'seller_phone', 'seller_email', 'buyer_name', 'buyer_address', 'buyer_vat', 'reference_number', 'sender_name', 'sender_address', 'sender_vat', 'sender_cr', 'sender_phone', 'sender_email', 'receiver_name', 'receiver_address', 'receiver_vat', 'receiver_signature', 'receiver_date', 'delivery_instructions'])
         copy(k, 600);
     if (['Invoices', 'ProformaInvoices'].includes(table)) {
-        for (const key of ['buyer_phone', 'buyer_id']) {
+        for (const key of ['buyer_phone', 'buyer_id', 'bank_name', 'bank_account_name', 'bank_account_number', 'bank_iban', 'bank_swift']) {
             if (Object.prototype.hasOwnProperty.call(b, key))
                 r[key] = String(b[key] ?? '').trim().slice(0, key === 'buyer_phone' ? 40 : 100);
         }
@@ -362,16 +363,18 @@ function cleanSpecial(table, b, r) {
         if (Object.prototype.hasOwnProperty.call(b, 'items')) {
             if (!Array.isArray(b.items) || !b.items.length || b.items.length > 100)
                 throw Error('Invoice requires 1–100 line items');
-            r.items = b.items.map(x => ({ description: String(x.description || '').trim().slice(0, 3000), quantity: Number(x.quantity), unit_price: Number(x.unit_price) }));
-            if (r.items.some(x => !x.description || !Number.isFinite(x.quantity) || x.quantity <= 0 || !Number.isFinite(x.unit_price) || x.unit_price < 0))
-                throw Error('Invalid invoice quantity or rate');
+            r.items = b.items.map(x => ({ description: String(x.description || '').trim().slice(0, 3000), quantity: Number(x.quantity), unit_price: Number(x.unit_price), discount_type: x.discount_type === 'fixed' ? 'fixed' : 'percent', discount_value: Number(x.discount_value ?? 0), vat_rate: Number(x.vat_rate ?? 15) }));
+            if (r.items.some(x => !x.description || !Number.isFinite(x.quantity) || x.quantity <= 0 || !Number.isFinite(x.unit_price) || x.unit_price < 0 || !Number.isFinite(x.discount_value) || x.discount_value < 0 || (x.discount_type === 'percent' && x.discount_value > 100) || (x.discount_type === 'fixed' && x.discount_value > x.quantity * x.unit_price) || !Number.isFinite(x.vat_rate) || x.vat_rate < 0 || x.vat_rate > 100))
+                throw Error('Invalid invoice quantity, rate, discount or VAT');
         }
         if (!r.items?.length)
             throw Error('Add at least one invoice line item');
         if (!r.seller_name?.trim())
             throw Error('Seller name is required');
-        const subtotal = Math.round(r.items.reduce((sum, x) => sum + x.quantity * x.unit_price, 0) * 100) / 100;
-        const vat = Math.round(subtotal * 0.15 * 100) / 100;
+        const rounded = value => Math.round((value + Number.EPSILON) * 100) / 100;
+        const calculated = r.items.map(x => { const base = rounded(x.quantity * x.unit_price); const discount = rounded(x.discount_type === 'fixed' ? x.discount_value : base * x.discount_value / 100); const taxable = rounded(base - discount); return { taxable, vat: rounded(taxable * x.vat_rate / 100), discount }; });
+        const subtotal = rounded(calculated.reduce((sum, x) => sum + x.taxable, 0));
+        const vat = rounded(calculated.reduce((sum, x) => sum + x.vat, 0));
         const allowedAdjustments = ['Shipping Charges', 'Convenience Fee', 'Courier Charges', 'Deduction', 'Delivery Charges', 'Gratuity', 'Retention', 'Round Off'];
         const incoming = Object.prototype.hasOwnProperty.call(b, 'adjustments') ? b.adjustments : (r.adjustments || []);
         if (!Array.isArray(incoming) || incoming.length > 25)
@@ -385,8 +388,8 @@ function cleanSpecial(table, b, r) {
             throw Error('Invoice grand total cannot be negative');
         r.subtotal = subtotal;
         r.vat_amount = vat;
-        r.tax_rate = 15;
-        r.discount = 0;
+        r.tax_rate = 15; // legacy display fallback; actual VAT is per line
+        r.discount = rounded(calculated.reduce((sum, x) => sum + x.discount, 0));
         r.amount = grand;
         r.notes = String(r.notes || '').replace(/(?:\n|^)(?:Amount paid: SAR [\d,.]+\. Pending balance: SAR [\d,.]+\.)/g, '').trim();
         if (r.status === 'Partially Paid') {
@@ -644,7 +647,7 @@ export default { async fetch(req, env) {
                             return reply({ error: 'Item count is locked. Only descriptions may be corrected.' }, 403, origin);
                         for (let i=0;i<b.items.length;i++) {
                             const before=old.items[i], after=b.items[i];
-                            for (const key of ['quantity','unit_price','unit']) if (key in after && String(after[key]) !== String(before[key]))
+                            for (const key of ['quantity','unit_price','unit','discount_type','discount_value','vat_rate']) if (key in after && String(after[key]) !== String(before[key]))
                                 return reply({ error: 'Item quantities, rates and units are locked.' }, 403, origin);
                         }
                     }

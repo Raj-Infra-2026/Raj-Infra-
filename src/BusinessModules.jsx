@@ -78,10 +78,21 @@ const adjustmentValue = row => {
 };
 const adjustmentTotal = rows => num((rows || []).reduce((sum, row) => sum + adjustmentValue(row), 0));
 
-export function invoiceTotals(items, adjustments = []) { 
-  const subtotal = num((items || []).reduce((s, x) => s + Number(x.quantity || 0) * Number(x.unit_price || 0), 0)); 
-  const vat = num(subtotal * 0.15); 
-  return { subtotal, vat, adjustments: adjustmentTotal(adjustments), total: num(subtotal + vat + adjustmentTotal(adjustments)) }; 
+export const invoiceLineAmounts = line => {
+  const base = num(Number(line.quantity || 0) * Number(line.unit_price || 0));
+  const discountValue = Number(line.discount_value ?? 0);
+  const discount = num(Math.min(base, line.discount_type === 'fixed' ? discountValue : base * discountValue / 100));
+  const taxable = num(base - discount);
+  const vat = num(taxable * Number(line.vat_rate ?? 15) / 100);
+  return { base, discount, taxable, vat, total: num(taxable + vat) };
+};
+export function invoiceTotals(items, adjustments = []) {
+  const lines = (items || []).map(invoiceLineAmounts);
+  const subtotal = num(lines.reduce((s, x) => s + x.taxable, 0));
+  const vat = num(lines.reduce((s, x) => s + x.vat, 0));
+  const discount = num(lines.reduce((s, x) => s + x.discount, 0));
+  const adjustmentsAmount = adjustmentTotal(adjustments);
+  return { subtotal, vat, discount, adjustments: adjustmentsAmount, total: num(subtotal + vat + adjustmentsAmount) };
 }
 
 function words(n) { 
@@ -171,14 +182,14 @@ export function printBusinessDocument(doc, kind = 'Invoices', preview = false, t
     const amount = isInvoice ? Number(doc.amount ?? totals.total) : 0;
     const adjustmentRows = isInvoice ? (doc.adjustments || []).map(row => `<div><span>${safe(row.type)}</span><b>${safe(sar(adjustmentValue(row)))}</b></div>`).join('') : '';
     const qr = kind === 'Invoices' ? qrSvg(invoiceQrPayload({ ...doc, amount, vat_amount: doc.vat_amount ?? totals.vat })) : '';
-    const rowItems = items.map((x, i) => isInvoice ? `<tr><td>${i + 1}</td><td class="description-cell">${safe(x.description || '').replace(/\n/g, '<br>')}</td><td>${safe(x.quantity)}</td><td>${safe(sar(x.unit_price))}</td><td>${safe(sar(Number(x.quantity) * Number(x.unit_price)))}</td></tr>` : `<tr><td>${i + 1}</td><td>${safe(x.description || '')}</td><td>${safe(x.quantity)}</td><td>${safe(x.unit || '')}</td><td>${safe(x.remarks || '')}</td></tr>`).join('');
+    const rowItems = items.map((x, i) => isInvoice ? `<tr><td>${i + 1}</td><td class="description-cell">${safe(x.description || '').replace(/\n/g, '<br>')}<br><small>Discount: ${safe(x.discount_value ?? 0)}${x.discount_type === 'fixed' ? ' SAR' : '%'} · VAT: ${safe(x.vat_rate ?? 15)}%</small></td><td>${safe(x.quantity)}</td><td>${safe(sar(x.unit_price))}</td><td>${safe(sar(invoiceLineAmounts(x).total))}</td></tr>` : `<tr><td>${i + 1}</td><td>${safe(x.description || '')}</td><td>${safe(x.quantity)}</td><td>${safe(x.unit || '')}</td><td>${safe(x.remarks || '')}</td></tr>`).join('');
     const sender = isInvoice ? { name: doc.seller_name, address: doc.seller_address, vat: doc.seller_vat, cr: doc.seller_cr, phone: doc.seller_phone, email: doc.seller_email } : { name: doc.sender_name, address: doc.sender_address, vat: doc.sender_vat, cr: doc.sender_cr, phone: doc.sender_phone, email: doc.sender_email };
     const receiver = { name: doc.buyer_name || doc.receiver_name || doc.name, address: doc.buyer_address || doc.receiver_address, vat: doc.buyer_vat || doc.receiver_vat };
     const logo = /^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(doc.company_logo || '') ? doc.company_logo : '';
     
     const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${safe(doc.reference || 'Tax Invoice')} - ${isProforma ? 'Proforma Invoice' : isInvoice ? 'Tax Invoice' : 'Delivery Note'}</title><style>
  @page{size:A4;margin:13mm}*{box-sizing:border-box}body{font:12px Arial,Tahoma,'Noto Naskh Arabic',sans-serif;color:#1c2633;background:#fff;margin:0}.ar{font-family:Tahoma,'Noto Naskh Arabic',Arial,sans-serif;direction:rtl;unicode-bidi:isolate;font-size:12px}.company-document-logo{width:76px;height:76px;object-fit:contain;flex-shrink:0;border-radius:8px}.seller-identity{display:flex;align-items:flex-start;gap:12px}.top{display:flex;justify-content:space-between;gap:15px;border-bottom:3px solid #252b3c;padding-bottom:14px}.top h1{font-size:23px;margin:0 0 6px}.top .right{text-align:right}.sub{color:#515969;line-height:1.65}.meta{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:13px 0}.meta div{background:#f3f4f8;padding:10px}.label{font-size:10px;color:#586175}.block{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:8px 0 16px}.panel{border:1px solid #ccd1da;padding:12px;min-height:94px}.panel h3{font-size:12px;margin:0 0 7px;background:#f1f2f6;padding:6px}.panel p{margin:4px 0;line-height:1.5}.note{font-size:11px;line-height:1.7;margin:12px 0}table{width:100%;border-collapse:collapse;table-layout:auto;margin-top:13px}th{background:#e6e8ed}td,th{border:1px solid #9ea6b3;padding:7px;text-align:left;vertical-align:top;font-size:10px}td:nth-last-child(-n+3){text-align:right}.description-cell{white-space:normal;overflow-wrap:anywhere;line-height:1.5;min-width:220px}thead{display:table-header-group}tr{break-inside:avoid}.bottom{display:flex;justify-content:space-between;gap:20px;margin-top:16px}.totals{width:250px;margin-left:auto}.totals div{display:flex;justify-content:space-between;padding:7px;border-bottom:1px solid #ddd}.totals .grand{font-size:15px;font-weight:bold;background:#e6e8ed}.signature{border:1px solid #aab0bb;min-height:92px;padding:10px;margin-top:24px}.signature p{margin:10px 0}.invoice-notes{margin-top:18px;padding-top:12px;border-top:1px solid #ccd1da;break-inside:avoid}.invoice-notes p{white-space:normal;overflow-wrap:anywhere;line-height:1.6}
- </style></head><body><div class="top"><div class="seller-identity">${logo ? `<img class="company-document-logo" src="${logo}" alt="Company logo"/>` : ''}<div><strong>${safe(sender.name || 'Sender')}</strong><div class="sub">${safe(sender.address || '')}<br/>CR: ${safe(sender.cr || '—')} · VAT: ${safe(sender.vat || '—')}<br/>${safe(sender.phone || '')} ${safe(sender.email || '')}</div></div></div><div class="right"><h1>${bilingual(isProforma ? 'PROFORMA INVOICE' : isInvoice ? 'TAX INVOICE' : 'DELIVERY NOTE', isProforma ? 'فاتورة أولية' : isInvoice ? 'فاتورة ضريبية' : 'مذكرة التسليم')}</h1><strong>${safe(doc.reference || 'INV-001')}</strong></div></div><div class="meta"><div><span class="label">${bilingual(isInvoice ? 'Invoice Date' : 'Delivery Date', isInvoice ? 'تاريخ الفاتورة' : 'تاريخ التسليم')}</span><br/><b>${safe(isInvoice ? displayInvoiceDateTime(doc) : (doc.date || ''))}</b></div><div><span class="label">${bilingual('PO Number', 'رقم أمر الشراء')}</span><br/><b>${safe(doc.po_number || doc.reference_number || '—')}</b></div><div><span class="label">${bilingual('Document Number', 'رقم المستند')}</span><br/><b>${safe(doc.reference || 'INV-001')}</b></div></div><div class="block"><div class="panel"><h3>${bilingual(isInvoice ? 'Seller' : 'Sender', isInvoice ? 'البائع' : 'المرسل')}</h3><p>${safe(sender.name || '')}</p><p>${safe(sender.address || '')}</p><p>VAT: ${safe(sender.vat || '—')}</p></div><div class="panel"><h3>${bilingual(isInvoice ? 'Buyer' : 'Receiver', isInvoice ? 'المشتري' : 'المستلم')}</h3><p>${safe(receiver.name || '')}</p><p>${safe(receiver.address || '')}</p><p>VAT: ${safe(receiver.vat || '—')}</p></div></div>${!isInvoice ? '<div class="note">This delivery note confirms receipt of the goods listed below.<p class="ar" lang="ar" dir="rtl">تؤكد مذكرة التسليم استلام البضائع المدرجة أدناه.</p></div>' : ''}<table><thead><tr><th>#</th>${isInvoice ? `<th style="width:48%">${bilingual('Description', 'الوصف')}</th><th>${bilingual('Qty', 'الكمية')}</th><th>${bilingual('Rate', 'السعر')}</th><th>${bilingual('Total', 'الإجمالي')}</th>` : `<th>${bilingual('Description', 'الوصف')}</th><th>${bilingual('Qty', 'الكمية')}</th><th>${bilingual('Unit', 'الوحدة')}</th><th>${bilingual('Remarks', 'ملاحظات')}</th>`}</tr></thead><tbody>${rowItems}</tbody></table>${isInvoice ? `<div class="bottom"><div>${qr}</div><div class="totals"><div><span>${bilingual('Subtotal', 'المجموع الفرعي')}</span><b>${safe(sar(doc.subtotal ?? totals.subtotal))}</b></div><div><span>${bilingual('VAT 15%', 'ضريبة القيمة المضافة ١٥٪')}</span><b>${safe(sar(doc.vat_amount ?? totals.vat))}</b></div>${adjustmentRows}<div class="grand"><span>${bilingual('Grand Total', 'الإجمالي شامل الضريبة')}</span><b>${safe(sar(amount))}</b></div></div></div><p><b>Amount in words:</b> ${safe(words(amount))}</p>` : `<p class="note">${safe(doc.delivery_instructions || '')}</p>`}${isInvoice ? (String(doc.notes || '').trim() ? `<section class="invoice-notes"><strong>${bilingual('Notes', 'ملاحظات')}</strong><p>${safe(doc.notes).replace(/\n/g, '<br>')}</p></section>` : '') : `<div class="signature"><p>${bilingual('Authorized Signature', 'توقيع المفوض')}: ______________________________</p><p>${bilingual('Receiver Name', 'اسم المستلم')}: ${safe(doc.receiver_name || '____________________________')}</p><p>${bilingual('Receiver Signature', 'توقيع المستلم')}: ______________________________</p><p>${bilingual('Date', 'التاريخ')}: ${safe(doc.receiver_date || '________________')}</p></div>`}</body></html>`;
+ </style></head><body><div class="top"><div class="seller-identity">${logo ? `<img class="company-document-logo" src="${logo}" alt="Company logo"/>` : ''}<div><strong>${safe(sender.name || 'Sender')}</strong><div class="sub">${safe(sender.address || '')}<br/>CR: ${safe(sender.cr || '—')} · VAT: ${safe(sender.vat || '—')}<br/>${safe(sender.phone || '')} ${safe(sender.email || '')}</div></div></div><div class="right"><h1>${bilingual(isProforma ? 'PROFORMA INVOICE' : isInvoice ? 'TAX INVOICE' : 'DELIVERY NOTE', isProforma ? 'فاتورة أولية' : isInvoice ? 'فاتورة ضريبية' : 'مذكرة التسليم')}</h1><strong>${safe(doc.reference || 'INV-001')}</strong></div></div><div class="meta"><div><span class="label">${bilingual(isInvoice ? 'Invoice Date' : 'Delivery Date', isInvoice ? 'تاريخ الفاتورة' : 'تاريخ التسليم')}</span><br/><b>${safe(isInvoice ? displayInvoiceDateTime(doc) : (doc.date || ''))}</b></div><div><span class="label">${bilingual('PO Number', 'رقم أمر الشراء')}</span><br/><b>${safe(doc.po_number || doc.reference_number || '—')}</b></div><div><span class="label">${bilingual('Document Number', 'رقم المستند')}</span><br/><b>${safe(doc.reference || 'INV-001')}</b></div></div><div class="block"><div class="panel"><h3>${bilingual(isInvoice ? 'Seller' : 'Sender', isInvoice ? 'البائع' : 'المرسل')}</h3><p>${safe(sender.name || '')}</p><p>${safe(sender.address || '')}</p><p>VAT: ${safe(sender.vat || '—')}</p></div><div class="panel"><h3>${bilingual(isInvoice ? 'Buyer' : 'Receiver', isInvoice ? 'المشتري' : 'المستلم')}</h3><p>${safe(receiver.name || '')}</p><p>${safe(receiver.address || '')}</p><p>VAT: ${safe(receiver.vat || '—')}</p></div></div>${!isInvoice ? '<div class="note">This delivery note confirms receipt of the goods listed below.<p class="ar" lang="ar" dir="rtl">تؤكد مذكرة التسليم استلام البضائع المدرجة أدناه.</p></div>' : ''}<table><thead><tr><th>#</th>${isInvoice ? `<th style="width:48%">${bilingual('Description', 'الوصف')}</th><th>${bilingual('Qty', 'الكمية')}</th><th>${bilingual('Rate', 'السعر')}</th><th>${bilingual('Total', 'الإجمالي')}</th>` : `<th>${bilingual('Description', 'الوصف')}</th><th>${bilingual('Qty', 'الكمية')}</th><th>${bilingual('Unit', 'الوحدة')}</th><th>${bilingual('Remarks', 'ملاحظات')}</th>`}</tr></thead><tbody>${rowItems}</tbody></table>${isInvoice ? `<div class="bottom"><div>${qr}</div><div class="totals"><div><span>${bilingual('Subtotal', 'المجموع الفرعي')}</span><b>${safe(sar(doc.subtotal ?? totals.subtotal))}</b></div><div><span>${bilingual('VAT', 'ضريبة القيمة المضافة')}</span><b>${safe(sar(doc.vat_amount ?? totals.vat))}</b></div>${adjustmentRows}<div class="grand"><span>${bilingual('Grand Total', 'الإجمالي شامل الضريبة')}</span><b>${safe(sar(amount))}</b></div></div></div><p><b>Amount in words:</b> ${safe(words(amount))}</p>` : `<p class="note">${safe(doc.delivery_instructions || '')}</p>`}${isInvoice ? (String(doc.notes || '').trim() ? `<section class="invoice-notes"><strong>${bilingual('Notes', 'ملاحظات')}</strong><p>${safe(doc.notes).replace(/\n/g, '<br>')}</p></section>` : '') : `<div class="signature"><p>${bilingual('Authorized Signature', 'توقيع المفوض')}: ______________________________</p><p>${bilingual('Receiver Name', 'اسم المستلم')}: ${safe(doc.receiver_name || '____________________________')}</p><p>${bilingual('Receiver Signature', 'توقيع المستلم')}: ______________________________</p><p>${bilingual('Date', 'التاريخ')}: ${safe(doc.receiver_date || '________________')}</p></div>`}</body></html>`;
     
     if (htmlOnly) return html;
     const w = targetWindow || window.open('', '_blank');
@@ -329,7 +340,7 @@ export function CompanySettingsPage({ request, onChanged }) {
     );
 }
 
-const emptyLine = () => ({ description: '', quantity: 1, unit_price: '', unit: 'PCS', remarks: '' });
+const emptyLine = () => ({ description: '', quantity: 1, unit_price: '', discount_value: 0, discount_type: 'percent', vat_rate: 15, unit: 'PCS', remarks: '' });
 const isEnteredLine = line => Boolean(String(line?.description || '').trim());
 const cleanDocumentLines = lines => (lines || []).filter(isEnteredLine);
 
@@ -411,6 +422,7 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
                 seller_address: current.seller_address || [profile.address, profile.district, profile.city, profile.postal_code].filter(Boolean).join(', '),
                 seller_phone: current.seller_phone || profile.phone || '',
                 seller_email: current.seller_email || profile.email || '',
+                ...Object.fromEntries(['bank_name','bank_account_name','bank_account_number','bank_iban','bank_swift'].map(key => [key, current[key] || profile[key] || ''])),
                 company_logo: current.company_logo || profile.logo_data || ''
             }));
         }).catch(error => { if (!cancelled) setError('Company Settings: ' + error.message); });
@@ -433,6 +445,7 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
                 seller_address: [profile.address, profile.district, profile.city, profile.postal_code].filter(Boolean).join(', '),
                 seller_phone: profile.phone,
                 seller_email: profile.email,
+                ...Object.fromEntries(['bank_name','bank_account_name','bank_account_number','bank_iban','bank_swift'].map(key => [key, current[key] || profile[key] || ''])),
                 company_logo: profile.logo_data || ''
             }));
             setShowCompanySettings(false);
@@ -591,12 +604,12 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
                         {form.items.map((x, i) => (
                           <div className="compact-document-row" key={i}>
                             <input aria-label={`Item ${i + 1} description`} value={x.description || ''} maxLength={3000} onChange={e => setLine(i, 'description', capitalizeStart(e.target.value))} placeholder="Item name / description" />
-                            <input aria-label={`Item ${i + 1} quantity`} type="number" min="0.001" step="any" value={x.quantity} onChange={e => setLine(i, 'quantity', e.target.value)} />
+                            <input disabled={!!editing} aria-label={`Item ${i + 1} quantity`} type="number" min="0.001" step="any" value={x.quantity} onChange={e => setLine(i, 'quantity', e.target.value)} />
                             {invoice ? <>
-                              <input aria-label={`Item ${i + 1} rate`} type="number" min="0" step="0.01" value={x.unit_price ?? ''} onChange={e => setLine(i, 'unit_price', e.target.value)} placeholder="Rate" />
-                              <div className="compact-readonly" title="Document-wide adjustments are managed in the summary">Document-level</div>
-                              <div className="compact-readonly" title="Existing document-wide VAT calculation">15% overall</div>
-                              <output className="compact-line-amount">{sar(Number(x.quantity || 0) * Number(x.unit_price || 0))}</output>
+                              <input disabled={!!editing} aria-label={`Item ${i + 1} rate`} type="number" min="0" step="0.01" value={x.unit_price ?? ''} onChange={e => setLine(i, 'unit_price', e.target.value)} placeholder="Rate" />
+                              <div className="alif-item-discount"><input disabled={!!editing} aria-label={`Item ${i + 1} discount`} type="number" min="0" max={x.discount_type === 'fixed' ? undefined : 100} step="0.01" value={x.discount_value ?? 0} onChange={e => setLine(i, 'discount_value', e.target.value)}/><select disabled={!!editing} aria-label={`Item ${i + 1} discount type`} value={x.discount_type || 'percent'} onChange={e => setLine(i, 'discount_type', e.target.value)}><option value="percent">%</option><option value="fixed">SAR</option></select></div>
+                              <div className="alif-lines-vat-cell"><input disabled={!!editing} aria-label={`Item ${i + 1} VAT percent`} type="number" min="0" max="100" step="0.01" value={x.vat_rate ?? 15} onChange={e => setLine(i, 'vat_rate', e.target.value)}/></div>
+                              <output className="compact-line-amount">{sar(invoiceLineAmounts(x).total)}</output>
                             </> : <>
                               <input aria-label={`Item ${i + 1} unit`} value={x.unit || ''} onChange={e => setLine(i, 'unit', e.target.value)} placeholder="Unit" />
                               <input aria-label={`Item ${i + 1} remarks`} value={x.remarks || ''} onChange={e => setLine(i, 'remarks', e.target.value)} placeholder="Remarks" />
@@ -607,33 +620,32 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
                         ))}
                       </div>
                     </div>
-                    {invoice && <p className="field-hint">Discount/adjustments and VAT follow the existing document-wide calculations. They are not independently calculated per item.</p>}
+                    
                 </div>
 
                 {invoice ? (
                     <div className="business-totals">
                         <div className="invoice-summary-title">
                             <h3>Invoice Summary</h3>
-                            <p>Review totals and optional adjustments before submitting.</p>
+                            
                         </div>
-                        <div><span>Subtotal</span><b>{sar(totals.subtotal)}</b></div>
-                        <div><span>VAT (15%)</span><b>{sar(totals.vat)}</b></div>
+                        
                         <div className="adjustment-editor">
                             <div className="adjustment-heading">
                                 <div><strong>Additional Charges / Deductions</strong></div>
-                                <button type="button" className="secondary adjustment-add" onClick={() => set('adjustments', [...(form.adjustments || []), { type: 'Shipping Charges', amount: 0 }])}><Plus size={16}/> Add Charge / Deduction</button>
+                                <button type="button" disabled={!!editing} className="secondary adjustment-add" onClick={() => set('adjustments', [...(form.adjustments || []), { type: 'Shipping Charges', amount: 0 }])}><Plus size={16}/> Add Charge / Deduction</button>
                             </div>
                             {(form.adjustments || []).map((row, i) => (
                                 <div className="adjustment-row" key={i}>
                                     <label>Charge / Deduction
-                                        <select aria-label="Adjustment type" value={row.type} onChange={e => set('adjustments', form.adjustments.map((r, j) => i === j ? { ...r, type: e.target.value } : r))}>
+                                        <select disabled={!!editing} aria-label="Adjustment type" value={row.type} onChange={e => set('adjustments', form.adjustments.map((r, j) => i === j ? { ...r, type: e.target.value } : r))}>
                                             {ADJUSTMENT_TYPES.map(type => <option key={type}>{type}</option>)}
                                         </select>
                                     </label>
                                     <label>Amount (SAR)
-                                        <input aria-label="Adjustment amount in SAR" type="number" step="0.01" value={row.amount} onChange={e => set('adjustments', form.adjustments.map((r, j) => i === j ? { ...r, amount: e.target.value } : r))}/>
+                                        <input disabled={!!editing} aria-label="Adjustment amount in SAR" type="number" step="0.01" value={row.amount} onChange={e => set('adjustments', form.adjustments.map((r, j) => i === j ? { ...r, amount: e.target.value } : r))}/>
                                     </label>
-                                    <button type="button" className="icon-btn" aria-label="Remove adjustment" onClick={() => set('adjustments', form.adjustments.filter((_, j) => i !== j))}><X size={16}/></button>
+                                    <button type="button" disabled={!!editing} className="icon-btn" aria-label="Remove adjustment" onClick={() => set('adjustments', form.adjustments.filter((_, j) => i !== j))}><X size={16}/></button>
                                 </div>
                             ))}
                             <div><span>Adjustments</span><b>{sar(totals.adjustments)}</b></div>
@@ -651,7 +663,7 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
                 )}
 
                 {invoice && <div className="business-section">
-                    <div className="section-title"><h3>Bank Details (optional, for this invoice only)</h3></div>
+                    <div className="section-title"><h3>Bank Details (prefilled from Company Settings; editable for this invoice)</h3></div>
                     <div className="form-grid">
                         {input('bank_name', 'Bank Name')}
                         {input('bank_account_name', 'Account Name')}
@@ -691,7 +703,7 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
                         <button type="button" className="icon-btn" onClick={() => setShowCompanySettings(false)} aria-label="Close Company Settings"><X size={18}/></button>
                     </div>
                     <div className="company-settings-grid">
-                        {COMPANY_PROFILE_FIELDS.map(([key, label, required]) => (
+                        {[...COMPANY_PROFILE_FIELDS, ...[['bank_name','Bank Name'],['bank_account_name','Bank Account Name'],['bank_account_number','Bank Account Number'],['bank_iban','IBAN'],['bank_swift','SWIFT Code']]].map(([key, label, required]) => (
                             <label key={key}>{label}
                                 <input value={company?.[key] || ''} required={required} maxLength={500} inputMode={key === 'vat_number' ? 'numeric' : key === 'phone' ? 'tel' : undefined} onChange={e => setCompany(current => ({ ...current, [key]: key === 'vat_number' ? e.target.value.replace(/\D/g, '').slice(0, 15) : e.target.value }))}/>
                             </label>
