@@ -329,7 +329,10 @@ export function CompanySettingsPage({ request, onChanged }) {
     );
 }
 
-const emptyLine = () => ({ description: '', quantity: 1, unit_price: 0, unit: 'PCS', remarks: '' });
+const emptyLine = () => ({ description: '', quantity: 1, unit_price: '', unit: 'PCS', remarks: '' });
+const isEnteredLine = line => Boolean(String(line?.description || '').trim());
+const cleanDocumentLines = lines => (lines || []).filter(isEnteredLine);
+
 
 export function DocumentModal({ kind, editing, clients, role, request, onSaved, close, ClientForm }) {
     const invoice = ['Invoices', 'ProformaInvoices'].includes(kind); 
@@ -369,7 +372,7 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
         receiver_date: editing?.receiver_date || '', 
         delivery_instructions: editing?.delivery_instructions || '', 
         adjustments: editing?.adjustments || [], 
-        items: editing?.items?.length ? editing.items : [emptyLine()] 
+        items: editing?.items?.length ? [...editing.items, emptyLine()] : [emptyLine()] 
     }));
     
     const [clientPoHistory, setClientPoHistory] = useState([]);
@@ -442,15 +445,21 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
 
     useEffect(() => setClientList(old => { const known = new Set(old.map(c => c.id)); return [...old, ...clients.filter(c => !known.has(c.id))]; }), [clients]);
     const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-    const setLine = (i, k, v) => setForm(f => ({ ...f, items: f.items.map((x, j) => j === i ? { ...x, [k]: v } : x) }));
+    const setLine = (i, k, v) => setForm(f => {
+        const items = f.items.map((x, j) => j === i ? { ...x, [k]: v } : x);
+        // Keep exactly one unused row at the end; preserve partially entered rows.
+        const entered = items.filter(isEnteredLine);
+        const pending = items.filter(x => !isEnteredLine(x) && (String(x.unit_price ?? '').trim() !== '' || String(x.remarks || '').trim()));
+        return { ...f, items: [...entered, ...pending, emptyLine()] };
+    });
     const chooseClient = id => { const c = clientList.find(x => x.id === id); setForm(f => ({ ...f, client_id: id, name: c?.name || '', buyer_name: c?.name || '', buyer_address: c?.address || '', buyer_vat: c?.vat_number || '', receiver_name: c?.name || '', receiver_address: c?.address || '', receiver_vat: c?.vat_number || '' })); };
-    const totals = useMemo(() => invoiceTotals(form.items, form.adjustments), [form.items, form.adjustments]);
-    const previewRecord = () => ({ ...form, seller_name_ar: form.seller_name_ar || company?.name_ar || '', seller_email: company?.email || form.seller_email || '', seller_website: company?.website || '', seller_address: form.seller_address || [company?.address,company?.district,company?.city,company?.postal_code].filter(Boolean).join(', '), company_logo: form.company_logo || company?.logo_data || '', po_number: form.reference_number || form.po_number || '', reference: form.reference || '', buyer_name: form.buyer_name || form.name, buyer_address: form.buyer_address || clientList.find(x => x.id === form.client_id)?.address || '', buyer_vat: form.buyer_vat || clientList.find(x => x.id === form.client_id)?.vat_number || '', receiver_address: form.receiver_address || clientList.find(x => x.id === form.client_id)?.address || '', receiver_vat: form.receiver_vat || clientList.find(x => x.id === form.client_id)?.vat_number || '', subtotal: totals.subtotal, vat_amount: totals.vat, amount: totals.total });
+    const totals = useMemo(() => invoiceTotals(cleanDocumentLines(form.items), form.adjustments), [form.items, form.adjustments]);
+    const previewRecord = () => ({ ...form, items: cleanDocumentLines(form.items), seller_name_ar: form.seller_name_ar || company?.name_ar || '', seller_email: company?.email || form.seller_email || '', seller_website: company?.website || '', seller_address: form.seller_address || [company?.address,company?.district,company?.city,company?.postal_code].filter(Boolean).join(', '), company_logo: form.company_logo || company?.logo_data || '', po_number: form.reference_number || form.po_number || '', reference: form.reference || '', buyer_name: form.buyer_name || form.name, buyer_address: form.buyer_address || clientList.find(x => x.id === form.client_id)?.address || '', buyer_vat: form.buyer_vat || clientList.find(x => x.id === form.client_id)?.vat_number || '', receiver_address: form.receiver_address || clientList.find(x => x.id === form.client_id)?.address || '', receiver_vat: form.receiver_vat || clientList.find(x => x.id === form.client_id)?.vat_number || '', subtotal: totals.subtotal, vat_amount: totals.vat, amount: totals.total });
 
     async function persist() { 
         setError(''); 
         if (!form.client_id) { setError('Select a client first'); return; } 
-        if (!form.items.length || form.items.some(x => !x.description?.trim() || !Number.isFinite(Number(x.quantity)) || Number(x.quantity) <= 0 || (invoice && (!Number.isFinite(Number(x.unit_price)) || Number(x.unit_price) < 0)))) {
+        if (!cleanDocumentLines(form.items).length || cleanDocumentLines(form.items).some(x => !x.description?.trim() || !Number.isFinite(Number(x.quantity)) || Number(x.quantity) <= 0 || (invoice && (!Number.isFinite(Number(x.unit_price)) || Number(x.unit_price) < 0)))) {
             setError('Add a description and a valid positive quantity for every item');
             return;
         } 
@@ -463,7 +472,7 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
         setBusy(true); 
         try {
             const payload = editing 
-                ? { notes: form.notes, items: form.items, status: form.status, ...(invoice ? {buyer_phone:form.buyer_phone,buyer_id:form.buyer_id,bank_name:form.bank_name,bank_account_name:form.bank_account_name,bank_account_number:form.bank_account_number,bank_iban:form.bank_iban,bank_swift:form.bank_swift} : {}), ...(kind === 'DeliveryNotes' ? { delivery_instructions: form.delivery_instructions } : {}) } 
+                ? { notes: form.notes, items: cleanDocumentLines(form.items), status: form.status, ...(invoice ? {buyer_phone:form.buyer_phone,buyer_id:form.buyer_id,bank_name:form.bank_name,bank_account_name:form.bank_account_name,bank_account_number:form.bank_account_number,bank_iban:form.bank_iban,bank_swift:form.bank_swift} : {}), ...(kind === 'DeliveryNotes' ? { delivery_instructions: form.delivery_instructions } : {}) } 
                 : { ...previewRecord() };
             const path = '/records/' + kind + (editing ? '/' + encodeURIComponent(editing.id) : '');
             const d = await request(path, { method: editing ? 'PATCH' : 'POST', body: JSON.stringify(payload) });
@@ -504,7 +513,7 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
         <div className={"record-modal business-modal " + (invoice ? "invoice-redesign" : "delivery-modal")} role="dialog" aria-modal="true" aria-label={invoice ? 'Invoice builder' : 'Delivery note builder'}>
             <div className="modal-header">
                 <div>
-                    <span className="overline">ALIF LABS / {proforma ? 'PROFORMA BUILDER' : invoice ? 'INVOICE BUILDER' : 'DELIVERY NOTE BUILDER'}</span>
+                    <span className="overline">{proforma ? 'PROFORMA BUILDER' : invoice ? 'INVOICE BUILDER' : 'DELIVERY NOTE BUILDER'}</span>
                     <h2>{editing ? 'Edit ' : 'New '}{proforma ? 'Proforma Invoice' : invoice ? 'Invoice' : 'Delivery Note'}</h2>
                 </div>
                 <button type="button" className="icon-btn" onClick={close}><X /></button>
@@ -567,38 +576,38 @@ export function DocumentModal({ kind, editing, clients, role, request, onSaved, 
                     </div>
                 </div>
 
-                <div className="business-section">
+                <div className="business-section compact-document-items">
                     <div className="section-title">
-                        <div>
-                            <h3>Line Items</h3>
-                            <p>Enter descriptions and quantities manually{invoice ? ', with rates in SAR.' : '.'}</p>
-                        </div>
-                        <button type="button" className="secondary" onClick={() => set('items', [...form.items, emptyLine()])}><Plus size={16}/> Add Item</button>
+                        <div><h3>Line Items</h3><p>Enter each item on one line. A new empty row appears automatically.</p></div>
+                        <button type="button" className="secondary" onClick={() => set('items', [...cleanDocumentLines(form.items), emptyLine()])}><Plus size={16}/> Add Item</button>
                     </div>
-                    {form.items.map((x, i) => (
-                        <div className="business-line manual-line" key={i}>
-                            <div className="invoice-line-number">Item {i + 1}</div>
-                            <label className="description-editor">Description
-                                <textarea required rows={3} maxLength={3000} value={x.description || ''} onChange={e => setLine(i, 'description', capitalizeStart(e.target.value))} placeholder="Work description, dimensions, specifications"/>
-                            </label>
-                            <label>Quantity
-                                <input required type="number" min="0.001" step="any" value={x.quantity} onChange={e => setLine(i, 'quantity', e.target.value)}/>
-                            </label>
-                            {invoice ? (
-                                <label>Rate (SAR)
-                                    <input required type="number" min="0" step="0.01" value={x.unit_price} onChange={e => setLine(i, 'unit_price', e.target.value)}/>
-                                </label>
-                            ) : (
-                                <>
-                                    <label>Unit<input required value={x.unit || ''} onChange={e => setLine(i, 'unit', e.target.value)}/></label>
-                                    <label>Remarks<input value={x.remarks || ''} onChange={e => setLine(i, 'remarks', e.target.value)}/></label>
-                                </>
-                            )}
-                            <button type="button" className="icon-btn remove-line" title="Remove item" disabled={form.items.length === 1} onClick={() => set('items', form.items.filter((_, j) => i !== j))}>
-                                <Trash2 size={17}/>
-                            </button>
+                    <div className="compact-document-scroll">
+                      <div className="compact-document-table">
+                        <div className="compact-document-head" aria-hidden="true">
+                          <span>Description</span><span>Qty</span><span>{invoice ? 'Rate (SAR)' : 'Unit'}</span>
+                          <span>{invoice ? 'Discount' : 'Remarks'}</span><span>{invoice ? 'VAT' : 'Amount'}</span>
+                          <span>{invoice ? 'Amount (SAR)' : ''}</span><span></span>
                         </div>
-                    ))}
+                        {form.items.map((x, i) => (
+                          <div className="compact-document-row" key={i}>
+                            <input aria-label={`Item ${i + 1} description`} value={x.description || ''} maxLength={3000} onChange={e => setLine(i, 'description', capitalizeStart(e.target.value))} placeholder="Item name / description" />
+                            <input aria-label={`Item ${i + 1} quantity`} type="number" min="0.001" step="any" value={x.quantity} onChange={e => setLine(i, 'quantity', e.target.value)} />
+                            {invoice ? <>
+                              <input aria-label={`Item ${i + 1} rate`} type="number" min="0" step="0.01" value={x.unit_price ?? ''} onChange={e => setLine(i, 'unit_price', e.target.value)} placeholder="Rate" />
+                              <div className="compact-readonly" title="Document-wide adjustments are managed in the summary">Document-level</div>
+                              <div className="compact-readonly" title="Existing document-wide VAT calculation">15% overall</div>
+                              <output className="compact-line-amount">{sar(Number(x.quantity || 0) * Number(x.unit_price || 0))}</output>
+                            </> : <>
+                              <input aria-label={`Item ${i + 1} unit`} value={x.unit || ''} onChange={e => setLine(i, 'unit', e.target.value)} placeholder="Unit" />
+                              <input aria-label={`Item ${i + 1} remarks`} value={x.remarks || ''} onChange={e => setLine(i, 'remarks', e.target.value)} placeholder="Remarks" />
+                              <div className="compact-readonly">—</div><div className="compact-readonly">—</div>
+                            </>}
+                            <button type="button" className="icon-btn compact-remove" title="Remove item" aria-label={`Remove item ${i + 1}`} disabled={form.items.length === 1} onClick={() => set('items', [...form.items.filter((_, j) => i !== j).filter(isEnteredLine), emptyLine()])}><Trash2 size={16}/></button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    {invoice && <p className="field-hint">Discount/adjustments and VAT follow the existing document-wide calculations. They are not independently calculated per item.</p>}
                 </div>
 
                 {invoice ? (

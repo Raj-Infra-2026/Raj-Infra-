@@ -713,3 +713,16 @@
 }
 .alif-lines-vat-cell select:focus-visible{outline:2px solid #17c8df;outline-offset:0}
 .alif-lines-row input:disabled,.alif-lines-vat-cell select:disabled{opacity:.65;cursor:not-allowed}
+
+/* Compact document line items: actual DocumentModal in BusinessModules.jsx */
+.business-modal .compact-document-items{gap:12px}
+.business-modal .compact-document-scroll{width:100%;overflow-x:auto;overscroll-behavior-x:contain}
+.business-modal .compact-document-table{min-width:810px;width:100%}
+.business-modal .compact-document-head,.business-modal .compact-document-row{display:grid;grid-template-columns:minmax(180px,2.6fr) minmax(65px,.65fr) minmax(95px,1fr) minmax(105px,1.1fr) minmax(90px,.9fr) minmax(130px,1.35fr) 38px;gap:8px;align-items:center}
+.business-modal .compact-document-head{padding:4px 0 9px;font-size:12px;font-weight:700;color:var(--muted,var(--text-muted,#637580))}
+.business-modal .compact-document-row{margin-bottom:8px}
+.business-modal .compact-document-row input,.business-modal .compact-document-row .compact-readonly,.business-modal .compact-document-row .compact-line-amount{box-sizing:border-box;min-width:0;width:100%;height:40px;min-height:40px;margin:0;padding:8px 10px;border-radius:9px;border:1px solid var(--line,var(--border,#ddd));background:var(--input-bg,var(--surface,#fff));color:inherit;font:inherit;font-size:13px;display:flex;align-items:center}
+.business-modal .compact-document-row .compact-readonly{font-size:11px;opacity:.75;white-space:nowrap}
+.business-modal .compact-document-row .compact-line-amount{justify-content:flex-end;text-align:right;font-weight:700;color:#087e9b;background:rgba(23,200,223,.10);font-variant-numeric:tabular-nums;white-space:nowrap}
+.business-modal .compact-document-row .compact-remove{height:40px;width:38px;margin:0;display:flex;align-items:center;justify-content:center}
+.business-modal .compact-document-row input:focus-visible{outline:2px solid #17c8df;outline-offset:1px}
