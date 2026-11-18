@@ -205,7 +205,7 @@ const COMPANY_PROFILE_FIELDS = [
     ['name_ar', 'Registered Company Name (Arabic)', false],
     ['vat_number', 'Saudi VAT Number (15 digits)', true],
     ['cr_number', 'Commercial Registration (CR)', true],
-    ['website', 'Company Website (optional)', false],
+    ['website', 'Company Website (optional — any text)', false],
     ['address', 'Company Address', false],
     ['city', 'City', false],
     ['district', 'District', false],
@@ -330,6 +330,24 @@ export function CompanySettingsPage({ request, onChanged }) {
                     </label>
                 )}
             </div>
+            <section className="company-bank-settings" aria-label="Company bank details">
+                <div className="section-title"><div><h3>Bank Details</h3><p>Saved as company defaults and automatically prefilled in new invoices. You can override them for each invoice.</p></div></div>
+                <div className="company-profile-fields">
+                    {[
+                        ['bank_name', 'Bank Name'],
+                        ['bank_account_name', 'Account Holder Name'],
+                        ['bank_account_number', 'Account Number'],
+                        ['bank_iban', 'IBAN'],
+                        ['bank_swift', 'SWIFT / BIC']
+                    ].map(([key, label]) => (
+                        <label key={key}>
+                            <span>{label}</span>
+                            <input type="text" value={profile[key] || ''} maxLength={500} placeholder={label}
+                                onChange={e => setProfile(current => ({ ...current, [key]: e.target.value }))}/>
+                        </label>
+                    ))}
+                </div>
+            </section>
             {error && <div className="notice error" role="alert">{error}</div>}
             {message && <div className="notice" role="status">{message}</div>}
             <div className="company-profile-footer">

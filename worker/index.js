@@ -271,7 +271,7 @@ function validateCompanySettings(data) {
     if (!/^\d{15}$/.test(profile.vat_number))
         throw Error('VAT number must contain exactly 15 digits');
     if (!profile.cr_number) throw Error('Company CR number is required');
-    if (profile.website && !/^https?:\/\/[^\s.]+(?:\.[^\s.]+)+/i.test(profile.website)) throw Error('Invalid company website URL');
+    // Website is optional free-form company text; do not require a URL format.
     if (profile.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profile.email))
         throw Error('Invalid company email address');
     if (profile.phone && !/^\+?[0-9 ()-]{7,22}$/.test(profile.phone))

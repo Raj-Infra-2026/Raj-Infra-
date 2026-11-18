@@ -740,3 +740,29 @@
 .business-modal .alif-lines-vat-cell input{width:100%;height:40px;min-height:40px;margin:0}
 .client-type-picker{margin-bottom:18px}
 .client-type-picker select{width:100%}
+
+/* Restore approved sticky, scroll-through navigation. The earlier relative
+   override disabled the transparent navbar's scrolling behavior. */
+.app-shell .alif-nav-header{
+  position:sticky;
+  top:0;
+  z-index:30;
+  background:transparent!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+}
+.app-shell .alif-nav-top{min-width:0;gap:16px;flex-wrap:wrap;align-content:center}
+.app-shell .alif-nav-brand{flex:1 1 190px;min-width:0;max-width:100%}
+.app-shell .alif-nav-brand strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.app-shell .alif-nav-tools{flex:0 1 auto;min-width:0;margin-left:auto}
+.app-shell .alif-nav-lower{clear:both}
+.app-shell .alif-cyan-page{position:relative;z-index:1}
+.app-shell .alif-dock-nav{
+  background:transparent!important;
+  backdrop-filter:blur(2px)!important;
+  -webkit-backdrop-filter:blur(2px)!important;
+}
+.company-bank-settings{margin-top:24px;padding:20px;border:1px solid var(--line);border-radius:15px;background:var(--surface)}
+.company-bank-settings .section-title{margin-bottom:15px}
+.company-bank-settings .section-title p{font-size:12px;color:var(--muted);margin-top:6px}
+@media(max-width:650px){.app-shell .alif-nav-top{gap:8px}.app-shell .alif-nav-brand{flex-basis:110px}.company-bank-settings{padding:14px}}
