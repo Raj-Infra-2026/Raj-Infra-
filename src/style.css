@@ -679,3 +679,37 @@
 .alif-lines-remove{display:grid;place-items:center;border:0;background:transparent;color:var(--muted);padding:0;cursor:pointer}
 .alif-lines-remove:disabled{opacity:.25;cursor:default}
 @media(max-width:900px){.alif-lines-scroll{scrollbar-width:thin}}
+
+/* Client workspace: ultra-clear outer glass, 0% fill, 2px blur.
+   Navigation buttons, focus wave and business functions remain unchanged. */
+.app-shell .alif-nav-header{
+  background:transparent!important;
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
+  border-bottom-color:transparent!important;
+}
+.app-shell .alif-dock-nav{
+  background:transparent!important;
+  -webkit-backdrop-filter:blur(2px)!important;
+  backdrop-filter:blur(2px)!important;
+  border:1px solid color-mix(in srgb,var(--line) 38%,transparent)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 8px 22px rgba(15,40,55,.07)!important;
+}
+.app-shell[data-theme="dark"] .alif-dock-nav{
+  border-color:rgba(200,238,250,.18)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 8px 22px rgba(0,0,0,.15)!important;
+}
+.app-shell .client-company-initial{
+  display:grid;place-items:center;flex:none;width:36px;height:36px;
+  border-radius:11px;background:#087e9b;color:#fff;font-size:17px;font-weight:750;
+}
+/* Compact invoice, proforma and quotation row: VAT dropdown exactly matches inputs. */
+.alif-lines-vat-cell{height:40px;min-height:40px;display:flex;align-items:stretch;min-width:0}
+.alif-lines-vat-cell select{
+  appearance:auto;display:block;box-sizing:border-box;width:100%;min-width:0;
+  height:40px!important;min-height:40px!important;margin:0!important;
+  padding:0 8px!important;border:1px solid var(--line);border-radius:7px;
+  background:var(--surface);color:var(--text);font:inherit;font-size:12px;line-height:normal;
+}
+.alif-lines-vat-cell select:focus-visible{outline:2px solid #17c8df;outline-offset:0}
+.alif-lines-row input:disabled,.alif-lines-vat-cell select:disabled{opacity:.65;cursor:not-allowed}
